@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Token 消耗统计</title>
+  <style>
+    body { background:#0f1117; color:#d7dae0; font-family: Consolas, Menlo, monospace; margin:20px; }
+    h1 { font-size:18px; }
+    a { color:#4fc3f7; text-decoration:none; }
+    .cards { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; }
+    .card { background:#171a23; border:1px solid #2a2f3a; border-radius:8px; padding:10px 14px; min-width:140px; }
+    .card b { font-size:20px; color:#4fc3f7; }
+    .card .sub { font-size:11px; color:#8a93a5; }
+    table { border-collapse:collapse; width:100%; margin-top:12px; }
+    th, td { border:1px solid #2a2f3a; padding:6px 10px; text-align:left; font-size:13px; }
+    th { background:#171a23; }
+    .warn { color:#f2cc60; } .ok { color:#7bd88f; } .bad { color:#ff7b72; }
+    .toolbar { display:flex; gap:10px; align-items:center; margin:10px 0; }
+    button { background:#222837; color:#d7dae0; border:1px solid #2a2f3a; border-radius:6px; padding:6px 12px; cursor:pointer; }
+    #lastUpdate { color:#8a93a5; font-size:12px; }
+  </style>
+</head>
+<body>
+  <h1><a href="/">←</a> Token 消耗统计</h1>
+  <div class="toolbar">
+    <button onclick="refresh()">刷新</button>
+    <span id="lastUpdate"></span>
+  </div>
+  <div id="cards" class="cards"></div>
+  <h2>最近 24 小时趋势（每小时）</h2>
+  <div id="trend"></div>
+  <h2>每次对话明细</h2>
+  <table id="tbl">
+    <thead><tr>
+      <th>时间</th><th>模型</th><th>输入</th><th>缓存</th><th>输出</th>
+      <th>推理</th><th>总计</th><th>来源</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+  <script>
+    async function refresh() {
+      try {
+        const r = await fetch('/api/token');
+        const s = await r.json();
+        document.getElementById('lastUpdate').textContent = '更新于 ' + s.time;
+        renderCards(s.metrics);
+        renderTrend(s.trend);
+        renderTable(s.records);
+      } catch (e) {
+        document.getElementById('lastUpdate').textContent = '连接失败';
+      }
+    }
+    function fmt(n) { return n == null ? '--' : Number(n).toLocaleString(); }
+    function fmtPct(v) { return v == null ? '--' : (v*100).toFixed(1) + '%'; }
+    function renderCards(m) {
+      document.getElementById('cards').innerHTML = [
+        `<div class="card">总消耗 <b>${fmt(m.total)}</b><div class="sub">${m.count} 次对话</div></div>`,
+        `<div class="card">输入 <b>${fmt(m.input)}</b><div class="sub">缓存 ${fmt(m.cached)}</div></div>`,
+        `<div class="card">输出 <b>${fmt(m.output)}</b><div class="sub">推理 ${fmt(m.reasoning)}</div></div>`,
+        `<div class="card">缓存命中 <b>${fmtPct(m.cache_hit_rate)}</b><div class="sub">cached/input</div></div>`,
+        `<div class="card">输出转化率 <b>${fmtPct(m.output_ratio)}</b><div class="sub">output/input</div></div>`,
+        `<div class="card">平均每次 <b>${fmt(Math.round(m.avg_input))}</b><div class="sub">input</div></div>`,
+      ].join('');
+    }
+    function renderTrend(trend) {
+      if (!trend.length) {
+        document.getElementById('trend').textContent = '暂无数据';
+        return;
+      }
+      const max = Math.max(...trend.map(h => h.total), 1);
+      const bars = trend.map(h => {
+        const w = Math.max(2, h.total / max * 100);
+        const t = new Date(h.ts*1000);
+        return `<div style="display:inline-block;margin-right:8px;text-align:center;vertical-align:bottom">
+          <div style="width:18px;height:60px;background:#222837;border-radius:3px;overflow:hidden;display:flex;align-items:flex-end">
+            <div style="width:100%;background:#4fc3f7;height:${w}%"></div>
+          </div>
+          <div style="font-size:10px;color:#8a93a5">${String(t.getHours()).padStart(2,'0')}:00</div>
+          <div style="font-size:10px;color:#8a93a5">${h.count}次</div>
+        </div>`;
+      }).join('');
+      document.getElementById('trend').innerHTML = '<div style="white-space:nowrap;overflow-x:auto">' + bars + '</div>';
+    }
+    function renderTable(rows) {
+      document.querySelector('#tbl tbody').innerHTML = (rows || []).map(r => {
+        const src = r.source === 'log_history'
+          ? '<span class="warn">日志历史</span>' : '<span class="ok">实时</span>';
+        return `<tr><td>${new Date(r.ts*1000).toLocaleString()}</td><td>${r.model}</td>
+          <td>${fmt(r.input)}</td><td>${fmt(r.cached)}</td><td>${fmt(r.output)}</td>
+          <td>${fmt(r.reasoning)}</td><td>${fmt(r.total)}</td><td>${src}</td></tr>`;
+      }).join('') || '<tr><td colspan="8">暂无记录</td></tr>';
+    }
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>场景明细</title>
+  <style>
+    body { background:#0f1117; color:#d7dae0; font-family: Consolas, Menlo, monospace; margin:20px; max-width:900px; }
+    a { color:#4fc3f7; }
+    table { border-collapse:collapse; margin-top:12px; }
+    td, th { border:1px solid #2a2f3a; padding:6px 10px; font-size:13px; }
+  </style>
+</head>
+<body>
+  <p><a href="/">&larr; 返回面板</a></p>
+  <h1 id="title">场景明细</h1>
+  <img id="chart" alt="chart" style="max-width:100%; background:#111">
+  <div id="table"></div>
+  <script>
+    const m = location.pathname.match(/^\/scenarios\/(\w+)\/(seed\d{2})$/);
+    const task = m[1], seed = m[2];
+    document.getElementById('title').textContent = `${task} ${seed} 场景明细`;
+    async function refresh() {
+      const r = await fetch(`/api/scenarios/${task}/${seed}`);
+      const d = await r.json();
+      document.getElementById('chart').src = d.chart + '?t=' + Date.now();
+      const rows = d.scenarios || [];
+      document.getElementById('table').innerHTML = rows.length
+        ? '<table><tr><th>场景</th><th>成功率</th><th>后退距离</th></tr>' +
+          rows.map(x => `<tr><td>${x.label || ''}</td><td>${(parseFloat(x.success_rate||0)*100).toFixed(0)}%</td>` +
+          `<td>${x.backward_dist == null ? '--' : parseFloat(x.backward_dist).toFixed(2)}m</td></tr>`).join('') +
+          '</table>'
+        : '暂无场景数据（先运行报告）';
+    }
+    refresh();
+    setInterval(refresh, 30000);
+  </script>
+</body>
+</html>

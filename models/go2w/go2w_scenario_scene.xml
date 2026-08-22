@@ -1,0 +1,186 @@
+<mujoco model="go2w scenario scene">
+  <include file="go2w.xml"/>
+
+  <statistic center="1 0 0.3" extent="3.0"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="90" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4"
+      rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+    <material name="scenario" rgba="0.45 0.42 0.38 1"/>
+    <material name="wall" rgba="0.35 0.4 0.5 1"/>
+    <material name="goal" rgba="0.2 0.8 0.3 1"/>
+
+    <!-- 运行时高度场地形：reset 时由 rl/terrain.py 写入 hfield_data。
+         size = (半宽x 2.5, 半宽y 1.25, 最大高程 2.4, 基底厚度 0.15)，
+         nrow=64 行(y)，ncol=128 列(x)，单元约 4cm。 -->
+    <hfield name="scn_terrain" size="2.5 1.25 2.4 0.15" nrow="64" ncol="128"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+    <camera name="track" mode="trackcom" target="base_link"
+      pos="-1.4 0 0.7" xyaxes="0 -1 0 0.894 0 0.447"/>
+    <!-- 全局俯视相机：覆盖 x∈[0,5] 全程，用于演示视频录制 -->
+    <camera name="overview" mode="fixed" pos="2.5 0 7" xyaxes="1 0 0 0 1 0" fovy="45"/>
+
+    <!-- 高度场地形：默认激活（斜坡任务）；curve/boxes 路径 reset 时挪远隐藏 -->
+    <geom name="scn_terrain" type="hfield" hfield="scn_terrain" pos="2.5 0 0"
+      material="scenario" contype="1" conaffinity="1"/>
+
+    <!-- 场景几何体：reset 时先把未使用几何体挪到远处，再按场景激活。
+         注意：MuJoCo 3.11 运行时写 geom_quat 不生效，因此需要旋转的几何
+         （斜坡、弯道墙）都包在 body 里，运行时写 body_pos/body_quat。 -->
+    <body name="scn_ramp_body" pos="100 1000 100">
+      <geom name="scn_ramp" type="box" size="1.5 1.0 0.03" material="scenario"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_ramp_flat_body" pos="100 1000 100">
+      <geom name="scn_ramp_flat" type="box" size="0.25 1.0 0.03" material="scenario"
+        contype="1" conaffinity="1"/>
+    </body>
+
+    <!-- S 形弯道走廊墙：8 段近似曲线，左右各一段，reset 时按切向旋转（body 旋转） -->
+    <body name="scn_curve_l_0_body" pos="100 1000 100">
+      <geom name="scn_curve_l_0" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_l_1_body" pos="100 1000 100">
+      <geom name="scn_curve_l_1" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_l_2_body" pos="100 1000 100">
+      <geom name="scn_curve_l_2" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_l_3_body" pos="100 1000 100">
+      <geom name="scn_curve_l_3" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_l_4_body" pos="100 1000 100">
+      <geom name="scn_curve_l_4" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_l_5_body" pos="100 1000 100">
+      <geom name="scn_curve_l_5" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_l_6_body" pos="100 1000 100">
+      <geom name="scn_curve_l_6" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_l_7_body" pos="100 1000 100">
+      <geom name="scn_curve_l_7" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_r_0_body" pos="100 1000 100">
+      <geom name="scn_curve_r_0" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_r_1_body" pos="100 1000 100">
+      <geom name="scn_curve_r_1" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_r_2_body" pos="100 1000 100">
+      <geom name="scn_curve_r_2" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_r_3_body" pos="100 1000 100">
+      <geom name="scn_curve_r_3" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_r_4_body" pos="100 1000 100">
+      <geom name="scn_curve_r_4" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_r_5_body" pos="100 1000 100">
+      <geom name="scn_curve_r_5" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_r_6_body" pos="100 1000 100">
+      <geom name="scn_curve_r_6" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_curve_r_7_body" pos="100 1000 100">
+      <geom name="scn_curve_r_7" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+
+    <!-- 多段路径（MoRA 阶段2）走廊墙：段1+段2 各 8 段，左右共 16 body -->
+    <body name="scn_mseg_l_0_body" pos="100 1000 100">
+      <geom name="scn_mseg_l_0" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_l_1_body" pos="100 1000 100">
+      <geom name="scn_mseg_l_1" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_l_2_body" pos="100 1000 100">
+      <geom name="scn_mseg_l_2" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_l_3_body" pos="100 1000 100">
+      <geom name="scn_mseg_l_3" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_l_4_body" pos="100 1000 100">
+      <geom name="scn_mseg_l_4" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_l_5_body" pos="100 1000 100">
+      <geom name="scn_mseg_l_5" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_l_6_body" pos="100 1000 100">
+      <geom name="scn_mseg_l_6" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_l_7_body" pos="100 1000 100">
+      <geom name="scn_mseg_l_7" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_r_0_body" pos="100 1000 100">
+      <geom name="scn_mseg_r_0" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_r_1_body" pos="100 1000 100">
+      <geom name="scn_mseg_r_1" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_r_2_body" pos="100 1000 100">
+      <geom name="scn_mseg_r_2" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_r_3_body" pos="100 1000 100">
+      <geom name="scn_mseg_r_3" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_r_4_body" pos="100 1000 100">
+      <geom name="scn_mseg_r_4" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_r_5_body" pos="100 1000 100">
+      <geom name="scn_mseg_r_5" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_r_6_body" pos="100 1000 100">
+      <geom name="scn_mseg_r_6" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+    <body name="scn_mseg_r_7_body" pos="100 1000 100">
+      <geom name="scn_mseg_r_7" type="box" size="0.3 0.05 0.25" material="wall"
+        contype="1" conaffinity="1"/>
+    </body>
+
+    <geom name="scn_goal" type="box" size="0.02 0.8 0.15" pos="4.5 0 0.15"
+      material="goal" contype="0" conaffinity="0" group="2"/>
+  </worldbody>
+</mujoco>

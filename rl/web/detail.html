@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seed 详情</title>
+  <style>
+    body { background:#0f1117; color:#d7dae0; font-family: Consolas, Menlo, monospace; margin:20px; max-width:960px; }
+    a { color:#4fc3f7; }
+    table { border-collapse:collapse; margin-top:12px; }
+    td, th { border:1px solid #2a2f3a; padding:6px 10px; font-size:13px; }
+    .ok { color:#7bd88f; } .bad { color:#ff7b72; }
+    .spark { font-size:14px; letter-spacing:1px; color:#4fc3f7; }
+    button { background:#222837; color:#d7dae0; border:1px solid #2a2f3a; border-radius:6px; padding:6px 12px; cursor:pointer; margin-right:8px; }
+    button:disabled { opacity:.5; cursor:default; }
+    pre { background:#171a23; border:1px solid #2a2f3a; border-radius:6px; padding:10px; max-height:240px; overflow:auto; font-size:12px; }
+    #toast { position:fixed; right:16px; top:16px; background:#222837; border:1px solid #4fc3f7; padding:10px 16px; border-radius:8px; display:none; }
+    details.task-card { background:#171a23; border:1px solid #2a2f3a; border-radius:8px; padding:10px 14px; margin:12px 0; }
+    details.task-card summary { cursor:pointer; font-weight:bold; color:#4fc3f7; }
+    .task-meta { font-size:12px; color:#8a93a5; margin:6px 0; }
+    .task-block { margin:4px 0; font-size:13px; }
+    .task-block b { color:#f2cc60; }
+    video { max-width:100%; border-radius:6px; background:#000; }
+  </style>
+</head>
+<body>
+  <p><a href="/">&larr; 返回面板</a></p>
+  <h1 id="title">Seed 详情</h1>
+  <div id="actions">
+    <button onclick="doAction('report')">生成报告</button>
+    <button onclick="doAction('sync')">立即同步</button>
+    <button onclick="doAction('restart-guard')">重启守护</button>
+    <span id="scenarioLink"></span>
+  </div>
+  <div id="toast"></div>
+  <div id="taskinfo"></div>
+  <div id="info"></div>
+  <h2>演示视频（全局俯视）</h2>
+  <div id="demo">加载中…</div>
+  <h2>实时曲线（eval_log）</h2>
+  <img id="curve" alt="curve" style="max-width:100%; background:#111">
+  <h2>持久化历史曲线</h2>
+  <img id="historyCurve" alt="history" style="max-width:100%; background:#111">
+  <h2>守护日志</h2>
+  <pre id="glog">加载中…</pre>
+  <h2>报告</h2>
+  <div id="links"></div>
+  <script>
+    const m = location.pathname.match(/^\/seed\/(\w+)\/(seed\d{2})$/);
+    const task = m[1], seed = m[2];
+    document.getElementById('title').textContent = `${task} ${seed} 详情`;
+
+    async function refresh() {
+      const r = await fetch(`/api/seed/${task}/${seed}`);
+      const d = await r.json();
+      const st = d.seed_state;
+      const ti = d.task_info;
+      document.getElementById('taskinfo').innerHTML = ti ? `
+        <details class="task-card" open>
+          <summary>${ti.name}（${task}）</summary>
+          <div class="task-block">${ti.desc}</div>
+          <div class="task-meta">参数：${ti.params || '--'}</div>
+          <div class="task-block"><b>要求</b><ul>${(ti.requirements||[]).map(r=>`<li>${r}</li>`).join('')}</ul></div>
+          <div class="task-block"><b>目标</b> ${ti.goal || '--'}</div>
+        </details>` : '';
+      document.getElementById('info').innerHTML = st ? `
+        <table>
+          <tr><th>进度</th><td>${(st.timesteps/1e6).toFixed(2)}/8.00M (${(st.timesteps/8e6*100).toFixed(1)}%)</td></tr>
+          <tr><th>奖励</th><td>${(st.eval_reward ?? st.tb_reward ?? '--')}</td></tr>
+          <tr><th>ep_len</th><td>${st.ep_len ?? '--'}</td></tr>
+          <tr><th>速度</th><td>${st.speed == null ? '--' : st.speed.toFixed(0)} 步/s</td></tr>
+          <tr><th>预计剩余</th><td>${st.eta_seconds == null ? '--' : fmtEta(st.eta_seconds)}</td></tr>
+          <tr><th>std</th><td>${st.tb_std == null ? '--' : st.tb_std.toFixed(4)}</td></tr>
+          <tr><th>value_loss</th><td>${st.tb_value_loss == null ? '--' : st.tb_value_loss.toFixed(4)}</td></tr>
+          <tr><th>KL</th><td>${st.tb_kl == null ? '--' : st.tb_kl.toFixed(4)}</td></tr>
+          <tr><th>状态</th><td>${st.completed ? '<span class="ok">完成</span>' : st.alive ? '<span class="ok">运行</span>' : '<span class="bad">停止</span>'}</td></tr>
+          <tr><th>趋势</th><td class="spark">${spark(st.history || [])}</td></tr>
+        </table>` : '<p class="bad">暂无状态数据</p>';
+      const g = d.guard || {};
+      document.getElementById('info').innerHTML += g.status
+        ? `<p>守护: ${g.status}，重试 ${g.attempts ?? 0} 次${g.last_error ? '，错误: ' + g.last_error : ''}</p>`
+        : '<p>守护记录: 无</p>';
+      const dm = d.demos || {};
+      document.getElementById('demo').innerHTML = dm.mp4
+        ? `<video controls preload="metadata" src="${dm.mp4}"></video>
+           <p><a href="${dm.gif || dm.mp4}">下载 ${dm.gif ? 'GIF' : 'MP4'}</a></p>`
+        : '暂无演示视频（任务完成后自动生成）';
+      document.getElementById('curve').src = `/curve/${task}/${seed}?t=${Date.now()}`;
+      document.getElementById('historyCurve').src = `/history/${task}/${seed}?t=${Date.now()}`;
+      document.getElementById('links').innerHTML =
+        `<a href="${d.links.report}">查看报告</a>`;
+      document.getElementById('scenarioLink').innerHTML = d.links.scenarios
+        ? `<a href="${d.links.scenarios}">场景明细</a>` : '';
+      const lr = await fetch(`/api/guard/log/${task}/${seed}`);
+      const lg = await lr.json();
+      document.getElementById('glog').textContent = lg.log;
+    }
+
+    async function doAction(kind) {
+      const names = {report:'生成报告', sync:'立即同步', 'restart-guard':'重启守护'};
+      if (!confirm(`确定执行「${names[kind]}」？`)) return;
+      const btn = event.target;
+      btn.disabled = true;
+      try {
+        const r = await fetch(`/api/action/${kind}`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: kind === 'report' ? JSON.stringify({task, seed}) : '{}'
+        });
+        const d = await r.json();
+        toast(d.ok ? `${names[kind]}已触发` : `失败: ${d.error || ''}`);
+      } catch (e) { toast('请求失败'); }
+      btn.disabled = false;
+    }
+
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 3000);
+    }
+    function fmtEta(sec) {
+      const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+      return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+    }
+    function spark(vals) {
+      if (!vals.length) return '—';
+      const lo = Math.min(...vals), hi = Math.max(...vals);
+      if (hi === lo) return '▄'.repeat(Math.min(vals.length, 20));
+      const chars = '▁▂▃▄▅▆▇█';
+      return vals.slice(-20).map(v =>
+        chars[Math.round((v-lo)/(hi-lo)*(chars.length-1))]).join('');
+    }
+    refresh();
+    setInterval(refresh, 10000);
+  </script>
+</body>
+</html>

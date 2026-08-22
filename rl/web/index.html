@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Go2w RL 训练面板</title>
+  <style>
+    body { background:#0f1117; color:#d7dae0; font-family: Consolas, Menlo, monospace; margin:20px; }
+    h1 { font-size:18px; }
+    .cards { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; }
+    .card { background:#171a23; border:1px solid #2a2f3a; border-radius:8px; padding:10px 14px; min-width:120px; }
+    .card b { font-size:22px; color:#4fc3f7; }
+    .guard-ok { color:#7bd88f; } .guard-bad { color:#ff7b72; }
+    table { border-collapse:collapse; width:100%; margin-top:12px; }
+    th, td { border:1px solid #2a2f3a; padding:6px 10px; text-align:left; font-size:13px; }
+    th { background:#171a23; }
+    tr.clickable { cursor:pointer; }
+    tr.clickable:hover td { background:#1a2030; }
+    .ok { color:#7bd88f; } .bad { color:#ff7b72; } .warn { color:#f2cc60; }
+    .spark { font-size:12px; letter-spacing:1px; color:#4fc3f7; }
+    .bar { background:#222837; border-radius:4px; height:8px; width:120px; overflow:hidden; }
+    .bar > div { background:#4fc3f7; height:100%; }
+    a { color:#4fc3f7; text-decoration:none; }
+    .alert { color:#ff7b72; margin:4px 0; font-size:13px; }
+    .history { color:#8a93a5; font-size:12px; margin:2px 0; }
+    .error-banner { background:#3a1d22; border:1px solid #ff7b72; color:#ffb3ad; padding:8px 12px; border-radius:6px; display:none; }
+    .toolbar { display:flex; gap:10px; align-items:center; margin:10px 0; }
+    button { background:#222837; color:#d7dae0; border:1px solid #2a2f3a; border-radius:6px; padding:6px 12px; cursor:pointer; }
+    .report-card { background:#171a23; border:1px solid #2a2f3a; border-radius:8px; padding:8px 12px; display:inline-block; margin:4px; }
+    details.task-card { background:#171a23; border:1px solid #2a2f3a; border-radius:8px; padding:10px 14px; margin:8px 0; }
+    details.task-card summary { cursor:pointer; font-weight:bold; color:#4fc3f7; }
+    .task-meta { font-size:12px; color:#8a93a5; margin:6px 0; }
+    .task-block { margin:4px 0; font-size:13px; }
+    .task-block b { color:#f2cc60; }
+    .demo-card { background:#171a23; border:1px solid #2a2f3a; border-radius:8px; padding:8px 12px; display:inline-block; margin:6px; vertical-align:top; }
+    .demo-card video { display:block; max-width:340px; border-radius:6px; background:#000; margin-top:6px; }
+  </style>
+</head>
+<body>
+  <h1>Go2w RL 训练面板</h1>
+  <p><a href="/token">Token 消耗统计 →</a></p>
+  <div class="error-banner" id="err">连接失败，重试中…</div>
+  <div class="toolbar">
+    <button onclick="refresh()">手动刷新</button>
+    <label><input type="checkbox" id="auto" checked onchange="toggleAuto()"> 自动刷新 5s</label>
+    <span id="lastUpdate" style="color:#8a93a5"></span>
+  </div>
+  <div id="res" class="cards"></div>
+  <div style="margin:10px 0">
+    <img id="reschart" src="/resources-chart" alt="资源趋势" style="max-width:100%;border:1px solid #2a2f3a;border-radius:8px">
+  </div>
+  <h2>课程学习（traverse_curve 直道 → S 弯）</h2>
+  <div id="curriculum">加载中…</div>
+  <h2>自定义训练（MoRA/实验，自动发现）</h2>
+  <div id="highlevel">加载中…</div>
+  <div id="alerts"></div>
+  <div id="history"></div>
+  <table id="tbl">
+    <thead><tr>
+      <th>任务/seed</th><th>进度</th><th>奖励</th><th>ep_len</th>
+      <th>速度</th><th>预计剩余</th><th>来源</th><th>状态</th><th>MuJoCo</th><th>趋势</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+  <h2>任务聚合</h2>
+  <div id="tasks"></div>
+  <h2>任务说明 / 要求 / 目标</h2>
+  <div id="taskinfo"></div>
+  <h2>演示视频（全局俯视）</h2>
+  <div id="demos">加载中…</div>
+  <h2>自动报告</h2>
+  <div id="reports"></div>
+  <script>
+    let timer = null;
+    async function refresh() {
+      try {
+        const [r, vr] = await Promise.all([
+          fetch('/api/state'),
+          fetch('/api/viewers'),
+        ]);
+        const s = await r.json();
+        const viewers = await vr.json();
+        window.viewersData = {};
+        (viewers || []).forEach(v => { window.viewersData[v.key] = v; });
+        document.getElementById('err').style.display = 'none';
+        document.getElementById('lastUpdate').textContent = '更新于 ' + s.time;
+        renderCards(s);
+        renderCurriculum(s);
+        renderHighLevel(s);
+        renderAlerts(s);
+        renderTable(s);
+        renderTasks(s);
+        renderTaskInfo(s);
+        document.getElementById('reschart').src = '/resources-chart?t=' + Date.now();
+      } catch (e) {
+        document.getElementById('err').style.display = 'block';
+      }
+    }
+    function renderCards(s) {
+      const g = s.guard || {};
+      const r = s.resources || {};
+      const guardTxt = g.active
+        ? '<span class="guard-ok">守护运行中</span>'
+        : '<span class="guard-bad">守护未运行</span>';
+      const pipe = Object.entries(g.pipeline || {})
+        .map(([k,v]) => `${k}=${v || '无'}`).join(' ');
+      const avail = (r.mem_available_mb ?? 0) / 1024;
+      const swapPct = r.swap_percent ?? 0;
+      const cloud = s.cloud || {};
+      const cloudTxt = !cloud.exists ? '<span class="bad">无日志</span>'
+        : cloud.stale ? '<span class="bad">超时</span>'
+        : cloud.fail ? '<span class="bad">失败</span>'
+        : cloud.ok ? '<span class="ok">正常</span>' : '<span class="warn">未知</span>';
+      const oom = s.oom_event;
+      document.getElementById('res').innerHTML = [
+        `<div class="card">CPU <b>${(r.cpu_percent||0).toFixed(0)}%</b></div>`,
+        `<div class="card">内存 <b>${(r.mem_percent||0).toFixed(0)}%</b><br><span style="font-size:11px">可用 ${avail.toFixed(1)}GB · Swap ${swapPct.toFixed(0)}%</span></div>`,
+        `<div class="card">负载 <b>${(r.load||[]).map(x=>x.toFixed(1)).join('/')}</b></div>`,
+        `<div class="card">守护 ${guardTxt}<br><span style="font-size:11px">${pipe}</span></div>`,
+        `<div class="card">云端回传 ${cloudTxt}<br><span style="font-size:11px">${cloud.age_seconds==null?'--':fmtAge(cloud.age_seconds)}前</span></div>`,
+        oom ? `<div class="card" style="border-color:#ff7b72"><b style="color:#ff7b72">最近OOM</b><br><span style="font-size:11px">${oom.process}</span></div>` : '',
+      ].join('');
+    }
+    function stageLabel(name) {
+      return {
+        'stage1_straight': '直道',
+        'stage2_big_curve': '大弯',
+        'stage3_mid_curve': '中弯',
+        'stage4_target': '目标 S 弯',
+      }[name] || name;
+    }
+    function renderCurriculum(s) {
+      const c = s.curriculum;
+      const el = document.getElementById('curriculum');
+      if (!c || (!c.running && !c.completed && !(c.stages || []).some(x => x.exists))) {
+        el.innerHTML = '<div class="card">暂无课程学习运行或数据</div>';
+        return;
+      }
+      const statusTxt = c.running
+        ? '<span class="ok">运行中</span>'
+        : c.cloud_active ? '<span class="warn">云端运行</span>'
+        : c.completed ? '<span class="ok">已完成</span>' : '<span class="bad">未运行</span>';
+      const pct = c.total_target > 0
+        ? Math.min(100, c.total_steps / c.total_target * 100) : 0;
+      const rows = (c.stages || []).map(st => {
+        const spct = c.stage_steps > 0
+          ? Math.min(100, st.timesteps / c.stage_steps * 100) : 0;
+        const stTxt = st.status === 'running'
+          ? '<span class="ok">运行中</span>'
+          : st.status === 'completed' ? '<span class="ok">完成</span>'
+          : st.status === 'stopped' ? '<span class="bad">中断</span>'
+          : '<span class="warn">等待</span>';
+        return `<tr>` +
+          `<td>${stageLabel(st.name)}<br><span style="font-size:11px;color:#8a93a5">${st.name}</span></td>` +
+          `<td>${st.corridor}m</td><td>${st.amp}</td><td>${(st.threshold * 100).toFixed(0)}%</td>` +
+          `<td>${stTxt}</td>` +
+          `<td><div class="bar"><div style="width:${spct}%"></div></div>` +
+          `${(st.timesteps / 1e6).toFixed(2)}/${(c.stage_steps / 1e6).toFixed(1)}M (${spct.toFixed(0)}%)</td>` +
+          `<td>${st.reward == null ? '--' : st.reward.toFixed(2)}</td>` +
+          `<td>${st.ep_len == null ? '--' : st.ep_len.toFixed(0)}</td>` +
+          `<td>${st.best_model ? '✅' : '--'}</td></tr>`;
+      }).join('');
+      const reportLink = c.report
+        ? '<span class="report-card"><a href="/curriculum/report">课程学习报告</a></span>' : '';
+      el.innerHTML = `<div class="cards">` +
+        `<div class="card">状态 <b>${statusTxt}</b></div>` +
+        `<div class="card">阶段 <b>${c.current_stage ? stageLabel(c.current_stage) : '--'}</b></div>` +
+        `<div class="card">总进度 <b>${(c.total_steps / 1e6).toFixed(2)}/${(c.total_target / 1e6).toFixed(1)}M (${pct.toFixed(1)}%)</b></div>` +
+        `<div class="card">预计剩余 <b>${c.eta_seconds == null ? '--' : fmtEta(c.eta_seconds)}</b></div>` +
+        `</div>` +
+        `<table><thead><tr><th>阶段</th><th>走廊</th><th>振幅</th><th>阈值</th>` +
+        `<th>状态</th><th>进度</th><th>奖励</th><th>ep_len</th><th>best</th></tr></thead>` +
+        `<tbody>${rows}</tbody></table>${reportLink}`;
+    }
+    function renderAlerts(s) {
+      document.getElementById('alerts').innerHTML = (s.current_alerts || []).map(a => {
+        const hot = ['low_mem','high_swap'].includes(a.kind);
+        const style = hot ? 'style="background:#3a1d22;padding:4px 8px;border-radius:4px"' : '';
+        return `<div class="alert" ${style}>[${a.kind}] ${a.key} ${a.message}</div>`;
+      }).join('');
+      document.getElementById('history').innerHTML = (s.alert_history || []).slice().reverse()
+        .slice(0, 8).map(a =>
+          `<div class="history">[${a.kind}] ${a.key} 首次 ${fmtTime(a.first_seen)} 最近 ${fmtTime(a.last_seen)}</div>`
+        ).join('');
+    }
+    function renderTable(s) {
+      const tbody = document.querySelector('#tbl tbody');
+      tbody.innerHTML = (s.seeds || []).map(st => {
+        const pct = Math.min(100, st.timesteps / 8000000 * 100);
+        const status = st.completed ? '<span class="ok">完成</span>'
+          : st.alive ? '<span class="ok">运行</span>' : '<span class="bad">停止</span>';
+        const reward = st.eval_reward ?? st.tb_reward;
+        const [task, seed] = st.key.split('/');
+        const v = (window.viewersData || {})[st.key] || {};
+        return `<tr class="clickable" onclick="location.href='/seed/${task}/${seed}'">` +
+          `<td>${st.key}</td><td><div class="bar"><div style="width:${pct}%"></div></div>` +
+          `${(st.timesteps/1e6).toFixed(2)}/8.00M (${pct.toFixed(1)}%)</td>` +
+          `<td>${reward == null ? '--' : reward.toFixed(2)}</td><td>${st.ep_len ?? '--'}</td>` +
+          `<td>${st.speed == null ? '--' : st.speed.toFixed(0)}</td>` +
+          `<td>${st.eta_seconds == null ? '--' : fmtEta(st.eta_seconds)}</td>` +
+          `<td>${st.source === 'cloud' ? '<span class="warn">云端</span>' : '本机'}</td>` +
+          `<td>${status}</td><td>${viewerCell(task, seed, v)}</td>` +
+          `<td class="spark">${spark(st.history || [])}</td></tr>`;
+      }).join('');
+    }
+    function renderHighLevel(s) {
+      const hl = s.high_level;
+      const el = document.getElementById('highlevel');
+      if (!hl || !(hl.runs || []).length) {
+        el.innerHTML = '<div class="card">暂无高层训练数据</div>';
+        return;
+      }
+      const statusTxt = hl.running
+        ? '<span class="ok">运行中</span>'
+        : '<span class="bad">未运行</span>';
+      const rows = (hl.runs || []).map(r => {
+        const st = r.status === 'running'
+          ? '<span class="ok">运行中</span>'
+          : r.status === 'completed' ? '<span class="ok">完成</span>'
+          : '<span class="bad">停止</span>';
+        const totalTarget = r.live_total_target ||
+          (r.task === 'traverse_curve_junction' ? 1800000 : 2000000);
+        const pct = r.timesteps ? Math.min(100, r.timesteps / totalTarget * 100) : 0;
+        const stageTxt = r.live_stage && r.live_stage_timesteps != null
+          ? `<br><span style="font-size:11px;color:#8a93a5">${r.live_stage} ` +
+            `${Math.round(r.live_stage_timesteps / 1000)}k/${Math.round((r.live_stage_target || 0) / 1000)}k</span>`
+          : '';
+        const her = r.her && r.her.buffer_size
+          ? `buf=${r.her.buffer_size} loss=${r.her.loss}`
+          : '--';
+        return `<tr>` +
+          `<td>${r.task}<br><span style="font-size:11px;color:#8a93a5">${r.seed}</span></td>` +
+          `<td>${st}${r.early_stop ? `<br><span class="warn">${r.early_stop}</span>` : ''}</td>` +
+          `<td><div class="bar"><div style="width:${pct}%"></div></div>` +
+          `${(r.timesteps / 1e6).toFixed(2)}/${(totalTarget / 1e6).toFixed(2)}M ` +
+          `(${pct.toFixed(0)}%)${stageTxt}</td>` +
+          `<td>${r.mean_reward == null ? '--' : r.mean_reward.toFixed(1)}</td>` +
+          `<td>${r.fixed_success_rate == null ? '--' : (r.fixed_success_rate * 100).toFixed(0) + '%'}</td>` +
+          `<td>${r.fixed_mean_x == null ? '--' : r.fixed_mean_x.toFixed(3)}</td>` +
+          `<td>${r.random_success_rate == null ? '--' : (r.random_success_rate * 100).toFixed(0) + '%'}</td>` +
+          `<td>${r.random_mean_x == null ? '--' : r.random_mean_x.toFixed(3)}</td>` +
+          `<td>${r.mean_ep_len == null ? '--' : r.mean_ep_len.toFixed(0)}</td>` +
+          `<td>${her}</td>` +
+          `<td>${r.best_model ? '✅' : '--'}</td></tr>`;
+      }).join('');
+      el.innerHTML = `<div class="cards">` +
+        `<div class="card">状态 <b>${statusTxt}</b></div>` +
+        `<div class="card">PID <b>${hl.pid || '--'}</b></div>` +
+        `</div><table><thead><tr><th>任务/seed</th><th>状态</th><th>进度</th><th>奖励</th>` +
+        `<th>固定成功率</th><th>固定距离</th><th>随机成功率</th><th>随机距离</th>` +
+        `<th>ep_len</th><th>HER</th><th>best</th></tr></thead>` +
+        `<tbody>${rows}</tbody></table>`;
+    }
+    function renderTasks(s) {
+      document.getElementById('tasks').innerHTML = (s.tasks || []).map(t => {
+        const avail = (s.seeds || []).find(st => {
+          const v = (window.viewersData || {})[st.key];
+          return v && v.model_available && st.key.startsWith(t.task + '/');
+        });
+        const [qt, qs] = avail ? avail.key.split('/') : [null, null];
+        const quick = qt
+          ? `<button onclick="viewerStart('${qt}','${qs}','random')" style="margin-left:8px">▶ MuJoCo</button>`
+          : '';
+        return `<div class="card">${t.task}：完成 ${t.done}/${t.total} seeds，最佳 ${t.best == null ? '--' : t.best.toFixed(2)}，` +
+          `总步数 ${(t.total_steps/1e6).toFixed(2)}/${(t.target_steps/1e6).toFixed(2)}M，` +
+          `预计剩余 ${t.eta == null ? '--' : fmtEta(t.eta)}` +
+          `<a href="#taskinfo-${t.task}" style="margin-left:8px">说明</a>${quick}</div>`;
+      }).join('') || '暂无任务';
+    }
+    function renderTaskInfo(s) {
+      const info = s.task_info || {};
+      const order = ['balance','full_chain','traverse_slope','traverse_flat_slope','traverse_curve'];
+      document.getElementById('taskinfo').innerHTML = order.filter(k => info[k]).map(k => {
+        const t = info[k];
+        const reqs = (t.requirements || []).map(r => `<li>${r}</li>`).join('');
+        return `<details class="task-card" id="taskinfo-${k}">
+          <summary>${t.name}（${k}）</summary>
+          <div class="task-block">${t.desc}</div>
+          <div class="task-meta">参数：${t.params || '--'}</div>
+          <div class="task-block"><b>要求</b><ul>${reqs || '<li>--</li>'}</ul></div>
+          <div class="task-block"><b>目标</b> ${t.goal || '--'}</div>
+        </details>`;
+      }).join('') || '<div class="card">暂无任务说明</div>';
+    }
+    function viewerCell(task, seed, v) {
+      if (v.running) {
+        return `<button onclick="event.stopPropagation();viewerStop('${task}','${seed}')">■ 关闭</button>` +
+          `<span class="ok" style="margin-left:6px">PID ${v.pid}</span>`;
+      }
+      if (!v.model_available) return '<span class="muted">无模型</span>';
+      if (task.startsWith('traverse_')) {
+        const opts = ['flat_slope','slope','curve','random']
+          .map(x => `<option value="${x}">${x}</option>`).join('');
+        return `<select id="sc-${task}-${seed}" style="margin-right:4px">${opts}</select>` +
+          `<button onclick="event.stopPropagation();viewerStart('${task}','${seed}',document.getElementById('sc-${task}-${seed}').value)">▶ MuJoCo</button>`;
+      }
+      return `<button onclick="event.stopPropagation();viewerStart('${task}','${seed}','random')">▶ MuJoCo</button>`;
+    }
+    async function viewerStart(task, seed, scenario) {
+      try {
+        const r = await fetch('/api/action/viewer-start', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({task, seed, scenario: scenario || 'random'}),
+        });
+        const d = await r.json();
+        if (d.ok) {
+          alert(`已启动 MuJoCo 查看器（PID ${d.pid}）\n窗口打开可能需要几秒`);
+        } else {
+          alert('启动失败：' + (d.error || '未知错误'));
+        }
+      } catch (e) {
+        alert('请求失败：' + e);
+      }
+      refresh();
+    }
+    async function viewerStop(task, seed) {
+      if (!confirm(`确定关闭 ${task}/${seed} 的 MuJoCo 查看器？`)) return;
+      try {
+        const r = await fetch('/api/action/viewer-stop', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({task, seed}),
+        });
+        const d = await r.json();
+        alert(d.ok ? `已关闭查看器（PID ${d.pid}）` : '取消失败：' + (d.error || '未知错误'));
+      } catch (e) {
+        alert('请求失败：' + e);
+      }
+      refresh();
+    }
+    function fmtTime(ts) { const d = new Date(ts*1000); return d.toLocaleTimeString(); }
+    function fmtAge(sec) {
+      sec = Math.floor(sec);
+      const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+      if (h > 0) return `${h}h ${m}m`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    }
+    function fmtEta(sec) {
+      const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+      return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+    }
+    function spark(vals) {
+      if (!vals.length) return '—';
+      const lo = Math.min(...vals), hi = Math.max(...vals);
+      if (hi === lo) return '▄'.repeat(Math.min(vals.length, 20));
+      const chars = '▁▂▃▄▅▆▇█';
+      return vals.slice(-20).map(v =>
+        chars[Math.round((v-lo)/(hi-lo)*(chars.length-1))]).join('');
+    }
+    function toggleAuto() {
+      if (timer) { clearInterval(timer); timer = null; }
+      if (document.getElementById('auto').checked) timer = setInterval(refresh, 5000);
+    }
+    async function refreshReports() {
+      const r = await fetch('/reports');
+      const items = await r.json();
+      document.getElementById('reports').innerHTML = items.length
+        ? items.map(i =>
+          `<span class="report-card"><a href="${i.report}">${i.task}/${i.seed} 报告</a> ` +
+          `<a href="${i.curve}">曲线</a>` +
+          (i.scenarios ? ` <a href="${i.scenarios}">场景明细</a>` : '') +
+          `</span>`).join('')
+        : '暂无报告';
+    }
+    async function refreshDemos() {
+      try {
+        const r = await fetch('/api/demos');
+        const items = await r.json();
+        document.getElementById('demos').innerHTML = items.length
+          ? items.map(d =>
+            `<span class="demo-card">${d.task}/${d.seed}
+              <video controls preload="metadata" src="${d.mp4}"></video>
+              ${d.gif ? `<a href="${d.gif}">下载 GIF</a>` : ''}
+            </span>`).join('')
+          : '暂无演示视频（任务完成后自动生成）';
+      } catch (e) {
+        document.getElementById('demos').textContent = '加载失败';
+      }
+    }
+    refresh(); refreshReports(); refreshDemos();
+    timer = setInterval(refresh, 5000);
+    setInterval(refreshReports, 30000);
+    setInterval(refreshDemos, 30000);
+  </script>
+</body>
+</html>
