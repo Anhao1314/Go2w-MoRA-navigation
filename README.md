@@ -55,17 +55,46 @@ System 0 前视点跟踪 + 差速转向（→ 6 维力矩）
 
 完整设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-## 演示
+## 🎬 演示与成果
 
-![双轮自平衡](media/go2w_two_wheel_balance.gif)
+### 核心任务演示
 
-![10m 两段导航 A→B（多段+精确停止）](media/rl_traverse_curve_multi_segment_seed00_v2.gif)
+| 任务 | 演示 | 关键指标 |
+|---|---|---|
+| 双轮自平衡 | ![balance](media/go2w_two_wheel_balance.gif) | 保持10.5s，偏差0.002rad |
+| 弯道导航（分层控制） | ![curve](media/rl_traverse_curve_high_level_seed01.gif) | 1.355m，50k即100%，0摔倒 |
+| 10m长程导航A→B | ![multi-seg](media/rl_traverse_curve_multi_segment_seed00_v2.gif) | 10.73m，A停止100%，15.2s |
+| 岔路口决策 | ![junction](media/rl_traverse_curve_junction_seed00.gif) | 40/40，决策100%，7.0s |
+| 随机目标泛化 | ![bplus](media/rl_traverse_curve_high_level_bplus_seed00.gif) | 90%成功率，0.834m |
 
-![岔路口决策（A→左 / B→右）](media/rl_traverse_curve_junction_seed00.gif)
+### 失败→成功：12轮探索的关键转折
 
-![单段弯道分层导航](media/rl_traverse_curve_high_level_seed01.gif)
+单层方法（纯PPO v1-v5、BC初始化、DAgger 5轮、固定课程4阶段）在弯道任务上全部失败（≤0.7m或站桩不动）。
+通过消融实验定位到**动作空间设计**是核心瓶颈：给策略"停车"的合法出口（speed_scale≥0.5）会导致站桩局部最优；禁止停车（speed_scale≥0.9）后50k即100%通过。
 
-高清版见 `media/`（`*.mp4`）。
+![ablation](docs/images/curve_high_level_ablation.png)
+
+*单一变量消融：speed_scale下界0.5（红，站桩0m）vs 0.9（绿，50k即100%）*
+
+### 课程学习的意外发现
+
+junction 的三阶段课程出现了"stage2失败但stage3成功"的现象——stage2从人工中间态（岔路口yaw=0、零速度）出发全部失败，但stage3从正常起点出发的完整任务100%成功。根因：人工中间态的起始分布与策略自然到达该状态时的分布不匹配。结论：课程学习的中间态起始分布必须与自然状态匹配，否则不如直接学完整任务。
+
+multi_segment 的 v2 重训（停靠奖励+100、过冲惩罚、B点到达即终止、stage2单独BC预热）则让三个阶段全部100%通过，验证了奖励设计与阶段专用BC的价值。
+
+![multi-curriculum](docs/images/multi_segment_curriculum.png)
+![junction-curriculum](docs/images/junction_curriculum.png)
+
+*左：multi_segment v2 三阶段全部成功（P0/P1 修复后）；右：junction stage2 人工起始失败 vs stage3 完整任务成功。*
+
+### 消融实验汇总
+
+| 实验 | 变量 | 结果 | 结论 |
+|---|---|---|---|
+| 动作空间下界 | speed_scale≥0.5 vs ≥0.9 | 0% vs 100% | 禁止停车是分层控制关键 |
+| Goal-Conditioned | 有目标输入 vs 无 | 90% vs 100%（均达标） | 简单弯道下GC无独立增益 |
+| 课程中间态（junction） | 人工起始 vs 正常起始 | stage2 0% vs stage3 100% | 中间态分布必须匹配自然状态 |
+| 精确停止奖励（multi_segment） | docking +30 vs +100+过冲惩罚 | 0% vs 100% | 奖励设计决定长程任务成败 |
 
 ## 快速开始
 
