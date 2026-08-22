@@ -1,0 +1,2 @@
+label,task,max_dev,min_clear,dual_hold,recovered,settle_seconds,success,success_rate,distance,time_to_goal,falls,total_reward,mean_base_reward,nan
+RL PPO,full_chain,0.40034876849592105,-0.00027650201141399267,0.372,False,0.0,False,0.0,,,0.0,114.23449868452079,0.8864837091358663,False

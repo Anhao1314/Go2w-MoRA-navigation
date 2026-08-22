@@ -1,0 +1,61 @@
+{
+  "demo": {
+    "trajectories": 6,
+    "steps": 4677,
+    "params": {
+      "lookahead": 0.7,
+      "k_ang": 2.5,
+      "k_dev": 0.5,
+      "bias_clip": 1.0,
+      "forward": 0.12,
+      "noise_per_seed": {
+        "seed00": 0.03,
+        "seed01": 0.03,
+        "seed02": 0.01,
+        "seed03": 0.01,
+        "seed04": 0.01,
+        "seed05": 0.005
+      }
+    }
+  },
+  "vecnorm": {
+    "method": "random_policy_10000_steps",
+    "mean_range": [
+      -1.369,
+      1.401
+    ],
+    "var_range": [
+      0.0,
+      183.7647
+    ]
+  },
+  "bc_train": {
+    "optimizer": "Adam",
+    "lr": 0.001,
+    "batch_size": 512,
+    "epochs_ran": 57,
+    "val_patience": 30,
+    "final_train_loss": 0.000456,
+    "final_val_loss": 0.000818,
+    "network": "Linear(61,256)-Tanh-Linear(256,256)-Tanh-Linear(256,6)",
+    "loss": "MSE",
+    "updated_params": "policy_net+action_net"
+  },
+  "eval": {
+    "episodes": 20,
+    "successes": 0,
+    "success_rate": 0.0,
+    "mean_distance": 0.2767917564327939,
+    "max_distance": 0.2767917564327939,
+    "mean_ep_len": 466.0,
+    "falls": 20
+  },
+  "verdict": "失败（<0.5m，排查 norm/数据/训练）",
+  "files": {
+    "vecnorm": "curve_vecnorm.pkl",
+    "dataset": "bc_dataset.npz",
+    "model": "bc_pretrain.zip",
+    "log": "bc_training_log.csv",
+    "eval": "bc_evaluation.md"
+  }
+}

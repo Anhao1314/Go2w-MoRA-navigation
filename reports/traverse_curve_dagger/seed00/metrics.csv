@@ -1,0 +1,2 @@
+label,task,max_dev,min_clear,dual_hold,recovered,settle_seconds,success,success_rate,distance,time_to_goal,falls,total_reward,mean_base_reward,nan
+DAgger BC,traverse_curve,0.0,,0.0,False,,False,0.0,0.713,,0.0,0.0,0.0,False

@@ -1,0 +1,16 @@
+{
+  "task": "traverse_slope",
+  "seed": 0,
+  "verdict": "fail",
+  "checks": [
+    "❌ 整体成功率: 0% ≥ 80%",
+    "❌ 场景成功率 RL PPO (slope): 0% ≥ 60%"
+  ],
+  "scenarios": [
+    {
+      "label": "RL PPO (slope)",
+      "success_rate": 0.0,
+      "backward_dist": 0.0
+    }
+  ]
+}

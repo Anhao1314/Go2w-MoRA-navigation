@@ -1,0 +1,2 @@
+label,task,max_dev,min_clear,dual_hold,recovered,settle_seconds,success,success_rate,distance,time_to_goal,falls,total_reward,mean_base_reward,nan
+RL PPO (curve),traverse_curve,0.4072922164292656,,0.0,False,,False,0.0,0.0,,1.0,-14.037431406468462,0.9150300741865202,False

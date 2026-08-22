@@ -1,0 +1,11 @@
+seed,success,steps,time_s,seg1_ok,a_stop_ok,seg2_ok,max_dev,avg_speed
+0,True,834,8.33,True,True,True,0.043,0.765
+1,True,834,8.33,True,True,True,0.043,0.765
+2,True,834,8.33,True,True,True,0.043,0.765
+3,True,834,8.33,True,True,True,0.043,0.765
+4,True,834,8.33,True,True,True,0.043,0.765
+5,True,834,8.33,True,True,True,0.043,0.765
+6,True,834,8.33,True,True,True,0.043,0.765
+7,True,834,8.33,True,True,True,0.043,0.765
+8,True,834,8.33,True,True,True,0.043,0.765
+9,True,834,8.33,True,True,True,0.043,0.765

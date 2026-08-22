@@ -1,0 +1,2 @@
+label,task,success_rate,correct_rate,mean_x,mean_ep_len,mean_time,falls
+RL junction,traverse_curve_junction,1.0,1.0,5.0325124963867,702.5,7.024999999999449,0

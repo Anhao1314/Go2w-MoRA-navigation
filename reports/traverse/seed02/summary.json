@@ -1,0 +1,40 @@
+{
+  "task": "traverse",
+  "seed": 2,
+  "verdict": "fail",
+  "checks": [
+    "❌ 整体成功率: 68% ≥ 80%",
+    "✅ 场景成功率 RL PPO (flat): 100% ≥ 60%",
+    "❌ 场景成功率 RL PPO (slope): 40% ≥ 60%",
+    "❌ 场景成功率 RL PPO (narrow): 0% ≥ 60%",
+    "✅ 场景成功率 RL PPO (bumpy): 100% ≥ 60%",
+    "✅ 场景成功率 RL PPO (bump): 100% ≥ 60%"
+  ],
+  "scenarios": [
+    {
+      "label": "RL PPO (flat)",
+      "success_rate": 1.0,
+      "backward_dist": 0.0
+    },
+    {
+      "label": "RL PPO (slope)",
+      "success_rate": 0.4,
+      "backward_dist": 0.0
+    },
+    {
+      "label": "RL PPO (narrow)",
+      "success_rate": 0.0,
+      "backward_dist": 0.0
+    },
+    {
+      "label": "RL PPO (bumpy)",
+      "success_rate": 1.0,
+      "backward_dist": 0.0
+    },
+    {
+      "label": "RL PPO (bump)",
+      "success_rate": 1.0,
+      "backward_dist": 0.0
+    }
+  ]
+}

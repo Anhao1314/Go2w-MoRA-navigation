@@ -1,0 +1,7 @@
+{
+  "task": "traverse_curve_high_level",
+  "seed": 0,
+  "verdict": "pass",
+  "success_rate": 0.9,
+  "distance": 0.8339
+}

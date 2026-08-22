@@ -1,0 +1,16 @@
+{
+  "task": "traverse_curve",
+  "seed": 0,
+  "verdict": "fail",
+  "checks": [
+    "❌ 整体成功率: 0% ≥ 80%",
+    "❌ 场景成功率 RL PPO (curve): 0% ≥ 60%"
+  ],
+  "scenarios": [
+    {
+      "label": "RL PPO (curve)",
+      "success_rate": 0.0,
+      "backward_dist": 0.0
+    }
+  ]
+}
