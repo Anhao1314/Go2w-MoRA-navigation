@@ -1,6 +1,6 @@
 # Unitree Go2w 分层导航强化学习（MoRA-inspired）
 
-> MuJoCo 轮腿机器人作品集：从"双轮自平衡"到"10m 两段导航"再到"岔路口决策"。
+> MuJoCo 轮腿机器人作品集：从"单段弯道"到"10m 两段导航"再到"岔路口决策"。
 > 核心主线：用三层架构（System 2 决策 / System 1 导航 / System 0 控制）解决
 > 单层 PPO 学不会的长程导航问题。
 
@@ -31,7 +31,6 @@ success on a 10 m two-subgoal navigation task with precise stopping** and
 
 | 任务 | 方法 | 成功率 | 关键指标 |
 |---|---|---|---|
-| 双轮自平衡 | LQR 型反馈 | — | 保持 10.5s，偏差 0.002 rad |
 | 单段弯道（MoRA 分层） | System 0 + System 1 PPO | 100% | 1.355 m，0 摔倒 |
 | 单段弯道 B+ | 随机目标 + 轻量 HER | 90% | 0.834 m |
 | 单段弯道 B+ 无目标 | 消融对照组 | 100% | 1.352 m |
@@ -61,7 +60,6 @@ System 0 前视点跟踪 + 差速转向（→ 6 维力矩）
 
 | 任务 | 演示 | 关键指标 |
 |---|---|---|
-| 双轮自平衡 | ![balance](media/go2w_two_wheel_balance.gif) | 保持10.5s，偏差0.002rad |
 | 弯道导航（分层控制） | ![curve](media/rl_traverse_curve_high_level_seed01.gif) | 1.355m，50k即100%，0摔倒 |
 | 10m长程导航A→B | ![multi-seg](media/rl_traverse_curve_multi_segment_seed00_v2.gif) | 10.73m，A停止100%，15.2s |
 | 岔路口决策 | ![junction](media/rl_traverse_curve_junction_seed00.gif) | 40/40，决策100%，7.0s |
@@ -104,11 +102,11 @@ conda create -n mujoco_env python=3.10
 conda activate mujoco_env
 pip install -r requirements.txt
 
-# 2. 双轮自平衡演示（无显示环境加 MUJOCO_GL=egl）
-python scripts/demo_go2w.py
+# 2. 生成弯道演示轨迹（System 0 脚本控制器）
+python scripts/gen_demo_trajectory.py --seed 0
 
-# 3. 录制演示视频
-bash scripts/make_demo.sh balance
+# 3. 录制演示视频（无显示环境加 MUJOCO_GL=egl）
+bash scripts/make_demo.sh traverse_curve
 
 # 4. 全量测试
 python -m unittest discover -s tests -p 'test_*.py'
@@ -117,7 +115,7 @@ python -m unittest discover -s tests -p 'test_*.py'
 训练入口：
 
 ```bash
-# 单任务 PPO（balance / traverse_curve 等）
+# 单任务 PPO（traverse_curve 等）
 python rl/train.py --task traverse_curve --seed 0 --total-steps 2000000
 
 # 高层分层训练（单段/多段/岔路口课程学习）
@@ -133,7 +131,7 @@ python rl/webpanel.py --host 127.0.0.1 --port 8787
 
 ```text
 ├── rl/                  # 环境、PPO 训练、低层控制器、评估、Web 面板
-│   ├── go2w_env.py      # Gymnasium 环境（balance/traverse/多段/岔路口）
+│   ├── go2w_env.py      # Gymnasium 环境（traverse/多段/岔路口）
 │   ├── low_level_controller.py   # System 0 脚本控制器
 │   ├── high_level_env_wrapper.py # System 1 高层包装器（2 维动作）
 │   └── train.py         # SB3 PPO 训练入口
