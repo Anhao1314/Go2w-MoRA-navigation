@@ -3,6 +3,10 @@
 > 本文档说明环境搭建、演示运行、实验复现、模型评估和自定义任务的完整步骤。
 > 所有命令、参数和预期结果均来自项目实际文件（`--help` 输出、`rl/go2w_env.py`、
 > `rl/train.py`、各课程脚本与 `reports/` 验收数据），未做任何虚构。
+>
+> **公开快照说明**：仓库提交精选源码、模型、演示数据和报告，不持续提交完整
+> `rl/runs/`。报告中引用的原始训练曲线若不在仓库中，需要按对应脚本重新训练生成。
+> 项目定位与结果边界见 [PORTFOLIO.md](PORTFOLIO.md)。
 
 ## 目录
 
@@ -19,11 +23,16 @@
 
 ### 1.1 系统要求
 
-- 操作系统：Linux（推荐 Ubuntu 20.04/22.04）/ macOS / Windows（WSL2）
+- 操作系统：Linux（推荐；已在 Ubuntu 24.04 CPU 环境完成全量测试、MuJoCo/EGL、
+  PPO smoke 与评估链路验证）/ macOS / Windows（推荐 WSL2）
 - Python：3.10 或 3.12（项目测试环境）
-- 硬件：CPU 即可训练（4 envs 实测约 600 步/s，即约 36k 步/分钟）；GPU 可选（PyTorch 自动检测）
+- 硬件：CPU 可运行；在 i7-1185G7 CPU-only 环境，4096 步 smoke 约 29 秒，
+  长训练通常需要数小时。实际吞吐受任务、并行环境数和评估频率影响；GPU 可选。
 - 磁盘：仓库约 100MB；训练产物（rl/runs）另计，建议预留 500MB 以上
 - 无头服务器需要 EGL 渲染：`export MUJOCO_GL=egl`（`scripts/make_demo.sh` 已内置）
+
+原生 Windows 的大小写不敏感文件系统可能无法完整表达第三方模型资产中的同名大小写
+文件，建议在 WSL2 的 Linux 文件系统内克隆和运行，而不是直接使用 NTFS 工作区。
 
 ### 1.2 安装 MuJoCo
 
@@ -155,7 +164,7 @@ BC 预热模型不是通过该脚本加载的（多段/岔路口课程脚本才�
 **实验目的**：验证 A→B 两段导航 + 精确停止。P0 修复（docking 奖励 +100、
 过冲惩罚、B 点到达即终止）+ P1（stage2 单独 BC 预热）是关键。
 
-**前置：演示轨迹 + 两阶段 BC 预热**
+#### 前置：演示轨迹 + 两阶段 BC 预热
 
 ```bash
 # 主任务（段1）20 条演示
@@ -199,7 +208,7 @@ python scripts/train_multi_segment_curriculum.py \
 
 **实验目的**：验证 System 2 规则决策（A→左 / B→右）+ System 1 导航。
 
-**前置：演示轨迹 + BC 预热**
+#### 前置：演示轨迹 + BC 预热
 
 ```bash
 python scripts/gen_demo_junction.py        # 20 条（A 10 + B 10）
@@ -312,7 +321,7 @@ success_rate`（多段/岔路口还有 `passed_rate` 或 `correct_rate`）。
 ### 5.1 Go2wEnv 参数（`rl/go2w_env.py` 构造函数真实默认值）
 
 | 参数 | 默认值 | 说明 |
-|---|---|---|
+| --- | --- | --- |
 | `task` | `"balance"` | `balance`/`full_chain`/`full_chain_simple`/`traverse_flat_slope`/`traverse_slope`/`traverse_curve` |
 | `domain_randomize` | `True` | 质量/摩擦/惯性域随机化 |
 | `terrain` | `"hfield"` | `hfield` 运行时高度场 / `boxes` 旧盒状斜坡 |
@@ -387,8 +396,9 @@ BC 模型必须搭配对应的 `*_vecnorm.pkl`（`--bc-norm`/`--init-norm`）。
 
 ### Q4: 训练速度慢
 
-4 envs 实测约 600 步/s。可调 `--envs 8` 提速（内存相应增加）；
-先跑 `--smoke`（10k 步）验证配置，再启动完整训练。
+训练吞吐取决于 CPU、任务、`n_steps`、环境数和评估开销，不能用 README 中的单个
+速度数字作为预算。可逐步调高 `--envs`（内存相应增加），但应先记录一次本机 smoke
+的墙钟时间和峰值内存，再估算完整训练；先跑 `--smoke` 验证配置。
 
 ### Q5: 演示轨迹生成失败
 
@@ -402,13 +412,14 @@ BC 模型必须搭配对应的 `*_vecnorm.pkl`（`--bc-norm`/`--init-norm`）。
 python rl/webpanel.py --host 127.0.0.1 --port 8787
 ```
 
-浏览器打开 http://127.0.0.1:8787 查看训练进度/资源/报告；训练曲线另可用
+浏览器打开 <http://127.0.0.1:8787> 查看训练进度/资源/报告；训练曲线另可用
 `tensorboard --logdir rl/runs/`。
 
 ---
 
 ## 参考文档
 
+- [作品集说明](PORTFOLIO.md) — 项目贡献、证据链、限制与面试讲解建议
 - [架构设计](ARCHITECTURE.md) — MoRA 三层架构、观测空间演进、奖励设计
 - [实验总览](EXPERIMENTS.md) — 所有实验结果、失败教训、研究方法论
 - [第三方许可](THIRD_PARTY_NOTICES.md) — 宇树模型与地形算法许可声明
