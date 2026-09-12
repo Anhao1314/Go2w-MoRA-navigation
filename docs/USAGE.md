@@ -1,12 +1,14 @@
 # 使用与复现指南
 
+[返回首页](../README.md) · [架构](ARCHITECTURE.md) · [实验](EXPERIMENTS.md) · [使用指南](USAGE.md)
+
 > 本文档说明环境搭建、演示运行、实验复现、模型评估和自定义任务的完整步骤。
 > 所有命令、参数和预期结果均来自项目实际文件（`--help` 输出、`rl/go2w_env.py`、
 > `rl/train.py`、各课程脚本与 `reports/` 验收数据），未做任何虚构。
 >
 > **公开快照说明**：仓库提交精选源码、模型、演示数据和报告，不持续提交完整
 > `rl/runs/`。报告中引用的原始训练曲线若不在仓库中，需要按对应脚本重新训练生成。
-> 项目定位与结果边界见 [PORTFOLIO.md](PORTFOLIO.md)。
+> 项目定位与结果边界见 [README](../README.md#已知限制)。
 
 ## 目录
 
@@ -31,7 +33,7 @@
 - 磁盘：仓库约 100MB；训练产物（rl/runs）另计，建议预留 500MB 以上
 - 无头服务器需要 EGL 渲染：`export MUJOCO_GL=egl`（`scripts/make_demo.sh` 已内置）
 
-原生 Windows 的大小写不敏感文件系统可能无法完整表达第三方模型资产中的同名大小写
+macOS 和原生 Windows 的大小写不敏感文件系统可能无法完整表达第三方模型资产中的同名大小写
 文件，建议在 WSL2 的 Linux 文件系统内克隆和运行，而不是直接使用 NTFS 工作区。
 
 ### 1.2 安装 MuJoCo
@@ -239,7 +241,7 @@ python scripts/train_junction_curriculum.py \
 - stage1 250k 达标；**stage2 10 个 eval 点全 0%**（人工岔路口起点 yaw=0、v=0，
   分布不匹配）；stage3 完整任务 100%（约 1.008M 提前停止）
 
-**重要发现**：stage2 失败但 stage3 成功，证明课程学习的中间态起始分布必须与
+**重要发现**：stage2 失败但 stage3 成功，提示课程学习的中间态起始分布可能需要与
 策略自然到达该状态时的分布匹配。详见 `docs/EXPERIMENTS.md`。
 
 ### 3.4 B+ 随机目标泛化实验（可选）
@@ -257,11 +259,12 @@ python scripts/train_high_level_curve.py \
 （默认 10000/20000/256）。
 
 预期结果（`reports/traverse_curve_high_level_bplus/seed00/` 实测）：
-成功率 90%、平均距离 0.8339m、0 摔倒；无目标条件对照组为 100%/1.3522m。
+成功率 90%、平均距离 0.8339m、2 摔倒；无目标条件对照组为 100%/1.3522m。
+该历史报告配置记录 HER 为关闭，但末尾结论提到 HER；本节带 `--use-her` 的命令是功能入口，不保证重现该历史配置。
 
 ### 3.5 失败实验复现（可选，用于对比）
 
-以下实验在弯道任务上全部失败，复现用于理解"为什么分层控制是必要的"：
+以下实验在归档弯道任务上未达标，可作为不同控制接口与学习流程的对照：
 
 - **纯 PPO**：`python rl/train.py --task traverse_curve --total-steps 4000000`
   （建议先 `--smoke` 验证管线）→ 站桩 301 步不动或 ≤0.7m
@@ -274,6 +277,15 @@ python scripts/train_high_level_curve.py \
 ---
 
 ## 4. 模型评估
+
+### 当前模型资产
+
+当前快照包含教师轨迹及 `data/demo_trajectories/` 中的 BC `.zip` 模型与对应归一化 `.pkl` 文件；它们用于预热或基线，不是首页成功演示对应的最终 PPO 模型。
+
+首页弯道、多段和岔路口策略的最终训练目录 `rl/runs/` 未提交。查看已有视频不需要模型；重新评估或录像需要先按第 3 节训练，并取得同一 run 的模型、归一化参数和任务配置。不要混用不同观测维度或不同阶段的资产。
+
+`make_demo.sh` 面向单任务 PPO，要求对应 run 中的 `final_model.zip`、`.completed`、`best_model.zip` 与 `best_vec_normalize.pkl`；缺失时会跳过，不会自动训练，也不用于复现首页分层演示。
+
 
 ### 4.1 用已有模型生成验收报告
 
@@ -417,9 +429,20 @@ python rl/webpanel.py --host 127.0.0.1 --port 8787
 
 ---
 
+## 开发检查
+
+在安装依赖后，从仓库根目录运行：
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py'
+python -m pip install pyright
+pyright rl scripts mujoco_demos
+```
+
+静态检查工具单独安装；测试与检查结果取决于当前版本和环境，应以实际输出为准。轨迹生成会写入样例目录，重复运行前请备份需要保留的数据。
+
 ## 参考文档
 
-- [作品集说明](PORTFOLIO.md) — 项目贡献、证据链、限制与面试讲解建议
 - [架构设计](ARCHITECTURE.md) — MoRA 三层架构、观测空间演进、奖励设计
 - [实验总览](EXPERIMENTS.md) — 所有实验结果、失败教训、研究方法论
 - [第三方许可](THIRD_PARTY_NOTICES.md) — 宇树模型与地形算法许可声明
