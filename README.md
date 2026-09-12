@@ -1,115 +1,152 @@
-# Unitree Go2w 分层导航强化学习（MoRA-inspired）
+# Unitree Go2W Hierarchical RL Navigation (MoRA-inspired)
 
-[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.12-3776AB?logo=python&logoColor=white)](requirements.txt)
-[![MuJoCo](https://img.shields.io/badge/MuJoCo-3.11.0-0B7285)](https://mujoco.org/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+Hierarchical navigation research for the Unitree Go2W in MuJoCo: reduce the learning problem to high-level PPO commands, combine them with scripted control, and evaluate curve tracking, multi-stage docking and junction routing.
 
-## 项目概述
+**Stack:** Python · PyTorch · MuJoCo · Gymnasium · Stable-Baselines3
 
-本项目在 MuJoCo 中实现 Unitree Go2w 轮腿机器人的分层导航，支持弯道跟踪、两段导航与停靠、岔路口目标分支选择。系统由规则任务决策、高层 PPO 和脚本底层控制组成，包含 PPO、BC、DAgger、课程学习的实验与评估记录。
+**Methods:** PPO · behavior cloning (BC) · DAgger · curriculum learning · ablation studies
 
-当前结果来自仓库内指定的仿真任务，尚未完成实机验证。MoRA-inspired 指对三层思想的独立工程化映射；System 2 当前采用规则决策。
+[中文](README.zh-CN.md) · [Architecture](docs/ARCHITECTURE.md) · [Experiments](docs/EXPERIMENTS.md) · [Reproduction guide](docs/USAGE.md) · [MIT](LICENSE)
 
-**阅读入口：** [了解架构](docs/ARCHITECTURE.md) · [查看实验](docs/EXPERIMENTS.md) · [运行项目](docs/USAGE.md)
+## Demo / Key Results
 
-## 代表演示
+Archived simulation evaluations; these describe the complete rule/controller/policy system, not PPO alone.
 
-下面是已归档训练策略的仿真录像，可直接查看；快速开始生成的是脚本教师轨迹，不是这些 PPO 策略。
-
-| 弯道导航 | 两段导航 A→B | 岔路口导航 |
+| Task | Recorded result | Evidence |
 | --- | --- | --- |
-| ![弯道导航](media/rl_traverse_curve_high_level_seed01.gif) | ![两段导航与停靠](media/rl_traverse_curve_multi_segment_seed00_v2.gif) | ![岔路口导航](media/rl_traverse_curve_junction_seed00.gif) |
+| Curve navigation | **20/20 success**, mean distance 1.355 m, **0 falls** | [seed01 report](reports/traverse_curve_high_level/seed01/report.md) |
+| 10 m-class multi-stage A→B | **20/20 success**, A-stop 100%, mean distance 10.73 m, 15.2 s, **0 falls** | [v2 report](reports/traverse_curve_multi_segment/seed00_v2/report.md), [evaluation protocol](docs/USAGE.md) |
+| Quality check (2026-09-12) | **197 discovered: 196 passed, 1 skipped; Pyright 0 errors** | [scope and environment](docs/PORTFOLIO_VALIDATION.md) |
+| Junction A/B routing | **40/40 success**, correct branch 100%, mean time 7.0 s, **0 falls** | [junction report](reports/traverse_curve_junction/seed00/report.md) |
 
-[弯道 MP4](media/rl_traverse_curve_high_level_seed01.mp4) · [两段 MP4](media/rl_traverse_curve_multi_segment_seed00_v2.mp4) · [岔路口 MP4](media/rl_traverse_curve_junction_seed00.mp4)
+| Curve | Multi-stage A→B | Junction |
+| --- | --- | --- |
+| ![Curve policy](media/rl_traverse_curve_high_level_seed01.gif) | ![Multi-stage policy](media/rl_traverse_curve_multi_segment_seed00_v2.gif) | ![Junction policy](media/rl_traverse_curve_junction_seed00.gif) |
 
-## 快速开始
+Videos show archived trained policies. Quick-start teacher trajectories are different artifacts. Final PPO weights and full training logs are **not included** in this snapshot; reproduction requires retraining.
 
-推荐在 Linux 或 WSL2 的 Linux 文件系统中运行，使用 Python 3.10 或 3.12。模型资产存在大小写同名文件，macOS 和原生 Windows 的常见文件系统可能无法完整检出；参见[系统要求](docs/USAGE.md#11-系统要求)。
+## Problem
+
+Directly learning six low-level actions from a 61-dimensional observation produced stationary or short-range policies in the recorded curve experiments. The research question is whether explicit task state and a smaller navigation action space can support the repository's longer, staged tasks.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    G[Target A or B] --> S2[System 2: rule-based branch selection]
+    E[MuJoCo Go2W state and known path] --> W[Task observations and progress]
+    S2 --> W
+    W --> S1[System 1: high-level PPO]
+    S1 -->|speed_scale / turn_adjust| S0[System 0: lookahead / differential controller]
+    S2 -->|locked branch| S0
+    S0 -->|6 low-level actions| E
+```
+
+- [`Go2wEnv`](rl/go2w_env.py): simulation, rewards, progress, docking and termination.
+- [`HighLevelEnvWrapper`](rl/high_level_env_wrapper.py): goal/progress observations, two-dimensional policy interface and rule-based branch locking.
+- [`LowLevelController`](rl/low_level_controller.py): known-path tracking and scripted braking; junction steering uses the teacher branch geometry and currently **ignores `turn_adjust`**.
+
+MoRA-inspired denotes an independent mapping of a layered idea, **not an official reproduction**. System 2 is a rule module; no VLM/VLA or learned semantic planner is implemented.
+
+## Algorithms
+
+| Method | Implemented role | Entry point |
+| --- | --- | --- |
+| PPO | Low-level baselines and high-level navigation learning | [baseline](rl/train.py), [high-level curve](scripts/train_high_level_curve.py) |
+| BC | Scripted-teacher supervision; multi-stage/junction policy warm-start | [curve baseline](scripts/bc_pretrain.py), [multi-stage](scripts/bc_pretrain_multi_segment.py), [junction](scripts/bc_pretrain_junction.py) |
+| DAgger | Iterative teacher corrections for the low-level curve policy; recorded as unsuccessful | [training](scripts/dagger_train.py) |
+| Curriculum | Staged training, BC initialization and complete-task evaluation | [multi-stage](scripts/train_multi_segment_curriculum.py), [junction](scripts/train_junction_curriculum.py) |
+
+## Experimental Findings
+
+| Failure → diagnosis | Iteration / observation | Interpretation boundary |
+| --- | --- | --- |
+| Low-level PPO stagnates or travels ≤0.7 m | Separate scripted tracking from two-dimensional PPO commands | Architecture, state and exploration change together; no isolated causal proof |
+| High-level seed00 parks at speed lower bound 0.5 | Raise normal-navigation lower bound to 0.9; seed01 succeeds | Needs matched multi-seed controls |
+| First multi-stage run overshoots B; complete success 0% | Strengthen docking reward, penalize overshoot, terminate at B and add stage-specific BC; v2 succeeds | Contributions are bundled, not individually attributed |
+| Junction curriculum starts stage2 at artificial stationary/yaw-zero state; 0% | Complete-start stage3 succeeds | State-distribution mismatch is a hypothesis requiring a matched-start control |
+
+See [negative results and evidence caveats](docs/EXPERIMENTS.md), including discrepancies in the historical B+ HER narrative.
+
+## Ablation Studies
+
+- **BC vs random initialization:** both reach 0% success after 0.5 M steps. Training seeds and learning rates differ; this is an exploratory comparison, not a controlled estimate of BC's independent benefit. [Report](data/demo_trajectories/bc_ablation_report.md).
+- **DAgger:** five correction rounds; best recorded distance 0.915 m, still 0% success. Correction quality and near-fall labels remain concerns. [Report](data/demo_trajectories/dagger_training_report.md).
+- **Goal conditioning:** B+ random-goal evaluation records 90% and two falls; no-goal comparison records 100% under different goal conditions. This does not establish that goals are unnecessary in harder tasks. [B+](reports/traverse_curve_high_level_bplus/seed00/report.md), [no-goal](reports/traverse_curve_high_level_bplus_no_goal/seed00/report.md).
+
+## Final Results
+
+The Key Results table summarizes the archived successful runs. Episode-seed repetition is not equivalent to independent scenes or independent training seeds. Multi-stage/junction domain randomization is disabled, evaluation seeds overlap with stage evaluation, and distances use each report's metric definition. No real-robot or open-world claim is made.
+
+## Reproduction
+
+### Quick Start
+
+Use Python 3.10 or 3.12 on **Linux / WSL2's Linux filesystem**. Third-party model files include case-colliding filenames; common macOS/Windows filesystems cannot faithfully check out both.
 
 ```bash
 git clone https://github.com/Anhao1314/go2w-MoRA-navigation.git
 cd go2w-MoRA-navigation
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-验证环境，无需训练模型或显示窗口：
-
-```bash
+python -m pip install -r requirements-dev.txt
 python - <<'PYTHON'
 from rl.go2w_env import Go2wEnv
 env = Go2wEnv(task="traverse_curve", domain_randomize=False)
-obs, info = env.reset(seed=0)
-print("observation:", obs.shape, "action:", env.action_space.shape)
+obs, _ = env.reset(seed=0)
+print(obs.shape, env.action_space.shape)  # (61,), (6,)
 env.close()
 PYTHON
 ```
 
-预期维度为 `(61,)` 和 `(6,)`。生成脚本教师的弯道轨迹：
+### Training and evaluation
+
+The command below uses the current training entry point. The archived seed01 report describes 61-dimensional observations; current goal-conditioning defaults may add fields. Compare code/configuration with the report before attempting a matched historical experiment; do not treat the current command as a byte-for-byte replay.
 
 ```bash
-python scripts/gen_demo_trajectory.py --seed 0 --noise 0.0 --attempts 10
+python scripts/train_high_level_curve.py   --total-steps 2000000 --envs 4 --seed 1   --learning-rate 3e-4 --ent-coef 0.01   --run-dir rl/runs/traverse_curve_high_level/seed01
 ```
 
-成功时保存到 `data/demo_trajectories/curve_demo_seed00.npz`，会覆盖同名样例；失败尝试保存在该目录的 `failed/` 下。轨迹是 BC 数据，不会生成视频。训练、模型评估、录像和检查命令见[使用指南](docs/USAGE.md)。
+After training has created the matching model and normalization files:
 
-## 系统架构
-
-```text
-目标 A/B → System 2：规则分支选择与锁定
-                     ↓ 分支状态
-           System 1：PPO 导航策略
-                     ↓ 速度倍率 / 转向修正
-           System 0：路径跟踪与底层控制
-                     ↓ 6 维底层动作
-                MuJoCo Go2w 环境
+```bash
+python scripts/train_high_level_curve.py   --report-only --run-dir rl/runs/traverse_curve_high_level/seed01
 ```
 
-- **System 2：** 在岔路口决策区将 A 映射到左分支、B 映射到右分支。
-- **System 1：** 动作接口为 `[speed_scale, turn_adjust]`；观测按任务追加目标或进度状态。
-- **System 0：** 使用已知路径几何和仿真位置/航向进行跟踪；多段任务包含脚本制动与停止逻辑。
+For multi-stage/junction teacher generation, BC warm-start, staged training, smoke runs and video recording, follow the [full guide](docs/USAGE.md). Teacher generation and reporting may overwrite same-named samples/reports: use an isolated clone or back up historical artifacts. Dependencies partly use version ranges; save the exact environment and run configuration for each experiment. Historical results are reference observations, not retraining guarantees.
 
-当前岔路口执行分支未使用 `turn_adjust`，策略实际只调节速度。各层职责、观测与限制见[架构文档](docs/ARCHITECTURE.md)。
+## Project Structure
 
-## 实验结果
-
-以下为已有报告记录，并非每次重新训练的保证。距离列沿用报告指标，不代表统一的路径长度定义。
-
-| 任务 | 评估规模 | 成功率 | 报告指标 | 报告 |
-| --- | --- | --- | --- | --- |
-| 单段弯道 seed01 | 20 回合 | 100% | 平均距离 1.355 m，0 摔倒 | [弯道](reports/traverse_curve_high_level/seed01/report.md) |
-| 随机目标 B+ | 20 回合 | 90% | 平均距离 0.834 m，2 摔倒 | [B+](reports/traverse_curve_high_level_bplus/seed00/report.md) |
-| 无目标输入消融 | 20 回合 | 100% | 平均距离 1.352 m | [no-goal](reports/traverse_curve_high_level_bplus_no_goal/seed00/report.md) |
-| 两段导航 A→B | 20 回合 | 100% | A 点停止 100%，平均 15.2 s，0 摔倒 | [两段](reports/traverse_curve_multi_segment/seed00_v2/report.md) |
-| 岔路口 A/B | 40 回合（各 20） | 100% | 分支正确 100%，平均 7.0 s，0 摔倒 | [岔路口](reports/traverse_curve_junction/seed00/report.md) |
-
-配置、失败实验、消融和证据差异见[实验文档](docs/EXPERIMENTS.md)。
-
-## 仓库结构与文档导航
-
-| 目录 | 内容 |
+| Path | Purpose |
 | --- | --- |
-| [`rl/`](rl/) | 环境、分层控制、训练、评估与本地监控 |
-| [`scripts/`](scripts/) | BC、DAgger、课程训练、教师轨迹和报告入口 |
-| [`tests/`](tests/) | 环境、控制接口与工具链测试 |
-| [`reports/`](reports/) | 精选验收报告与指标 |
-| [`data/demo_trajectories/`](data/demo_trajectories/) | 教师轨迹、BC 模型、归一化参数与实验记录 |
-| [`media/`](media/) | 归档 GIF / MP4 |
-| [`models/go2w/`](models/go2w/) | Go2w 模型与许可 |
+| `rl/` | Environments, controllers, training, evaluation and local tools |
+| `scripts/` | Teacher data, BC, DAgger, curricula and recording |
+| `reports/` | Selected archived evaluations |
+| `data/demo_trajectories/` | Selected teacher data, BC models, normalization and research reports |
+| `tests/` | Environment, controller and tooling checks |
+| `media/`, `models/go2w/` | Recorded demos and third-party simulation assets |
+| `docs/` | Architecture, experiments, usage and attribution |
 
-- [架构设计](docs/ARCHITECTURE.md)：层级职责、观测、动作与实现入口。
-- [实验记录](docs/EXPERIMENTS.md)：结果、对照、失败与待验证问题。
-- [使用指南](docs/USAGE.md)：安装、演示、训练、评估、检查与常见问题。
-- [第三方声明](docs/THIRD_PARTY_NOTICES.md)：来源与许可说明。
+## Tests & Quality
 
-## 已知限制
+```bash
+python -m unittest discover -s tests -p 'test_*.py'
+pyright rl scripts mujoco_demos
+```
 
-- 当前使用仿真状态与已知路径，没有验证真实传感、实机控制或开放场景泛化。
-- 分支选择与部分停靠行为由脚本完成；结果描述整个系统，不能直接归因于 PPO。
-- 评估场景与样本有限，100% 仅表示对应批次全部成功。
-- `rl/runs/` 未提交；首页成功 PPO 演示对应的模型与归一化文件不在当前快照中，需按指南训练生成。已提交 BC 模型不等同于最终 PPO 模型。
+[CI](.github/workflows/ci.yml) installs dependencies, runs the suite and checks these source directories on Linux. The workflow definition is not a claim that CI has passed; inspect the actual Actions run. For headless rendering, CI uses EGL and installs Mesa. Current counts belong to the actual run, not a permanent badge.
 
-## 许可证
+## Limitations
 
-自研代码采用 [MIT License](LICENSE)。Go2w 模型许可见 [models/go2w/LICENSE](models/go2w/LICENSE)，其他来源见[第三方声明](docs/THIRD_PARTY_NOTICES.md)。
+Known path geometry and simulation pose are required. Branch decisions and parts of docking are scripted. Successful PPO weights are absent; BC artifacts are not substitutes. Scene diversity, independent held-out tests, multi-training-seed variability, real sensors and sim-to-real remain unverified.
+
+## Roadmap
+
+- Publish final PPO checkpoints with normalization, configuration and artifact hashes.
+- Add matched controller-only baselines and independent held-out scene/seed evaluation.
+- Test curriculum start-state matching and isolate docking/BC contributions.
+- Evaluate perception and real-robot interfaces before making deployment claims.
+
+## License
+
+Original code: [MIT](LICENSE). Go2W model: [model license](models/go2w/LICENSE). See [third-party notices](docs/THIRD_PARTY_NOTICES.md).
