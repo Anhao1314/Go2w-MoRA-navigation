@@ -1,0 +1,64 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <rect width="1280" height="640" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="1280" height="8" fill="#0B7285"/>
+
+  <!-- Left copy block -->
+  <text x="80" y="118" font-size="22" letter-spacing="4" fill="#64748B" font-weight="600">REINFORCEMENT LEARNING · ROBOTICS</text>
+  <text x="78" y="208" font-size="55" font-weight="800" fill="#0F172A">Unitree Go2W</text>
+  <text x="78" y="276" font-size="55" font-weight="800" fill="#0F172A">Hierarchical RL Navigation</text>
+  <text x="80" y="342" font-size="27" fill="#334155">Hierarchical reinforcement learning for robot</text>
+  <text x="80" y="380" font-size="27" fill="#334155">navigation in MuJoCo — simulation-only.</text>
+
+  <!-- keyword tags -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" font-weight="600">
+    <rect x="80" y="430" width="92" height="46" rx="8" fill="#F0FDFA" stroke="#0B7285" stroke-width="1.5"/>
+    <text x="126" y="460" fill="#0B7285" text-anchor="middle">PPO</text>
+    <rect x="188" y="430" width="76" height="46" rx="8" fill="#F0FDFA" stroke="#0B7285" stroke-width="1.5"/>
+    <text x="226" y="460" fill="#0B7285" text-anchor="middle">BC</text>
+    <rect x="280" y="430" width="120" height="46" rx="8" fill="#F0FDFA" stroke="#0B7285" stroke-width="1.5"/>
+    <text x="340" y="460" fill="#0B7285" text-anchor="middle">DAgger</text>
+    <rect x="416" y="430" width="278" height="46" rx="8" fill="#F0FDFA" stroke="#0B7285" stroke-width="1.5"/>
+    <text x="555" y="459" font-size="20" fill="#0B7285" text-anchor="middle">Curriculum Learning</text>
+  </g>
+
+  <!-- result chips -->
+  <g font-size="20" fill="#475569">
+    <text x="80" y="540" font-weight="700" fill="#0F172A" font-size="22">20/20 Curve</text>
+    <text x="238" y="540" fill="#94A3B8">·</text>
+    <text x="258" y="540" font-weight="700" fill="#0F172A" font-size="22">40/40 Junction</text>
+    <text x="486" y="540" fill="#94A3B8">·</text>
+    <text x="506" y="540" font-weight="700" fill="#0F172A" font-size="22">0 Falls</text>
+  </g>
+  <text x="80" y="586" font-size="19" fill="#64748B">196 passed / 1 skipped · Pyright 0 errors (documented local run)</text>
+
+  <!-- Right core visual: layered hierarchy -->
+  <g>
+    <rect x="800" y="150" width="400" height="86" rx="12" fill="#ECFEFF" stroke="#0B7285" stroke-width="2"/>
+    <text x="1000" y="186" text-anchor="middle" font-size="21" font-weight="700" fill="#0F172A">System 2 · Rule-based branch</text>
+    <text x="1000" y="216" text-anchor="middle" font-size="17" fill="#64748B">target A / B selection &amp; lock</text>
+
+    <path d="M1000 236 L1000 262" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#arG)"/>
+
+    <rect x="800" y="266" width="400" height="86" rx="12" fill="#ECFEFF" stroke="#0B7285" stroke-width="2"/>
+    <text x="1000" y="302" text-anchor="middle" font-size="21" font-weight="700" fill="#0F172A">System 1 · High-level PPO</text>
+    <text x="1000" y="332" text-anchor="middle" font-size="17" fill="#64748B">speed_scale / turn_adjust</text>
+
+    <path d="M1000 352 L1000 378" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#arG)"/>
+
+    <rect x="800" y="382" width="400" height="86" rx="12" fill="#ECFEFF" stroke="#0B7285" stroke-width="2"/>
+    <text x="1000" y="418" text-anchor="middle" font-size="21" font-weight="700" fill="#0F172A">System 0 · Controller</text>
+    <text x="1000" y="448" text-anchor="middle" font-size="17" fill="#64748B">lookahead / differential drive</text>
+
+    <path d="M1000 468 L1000 494" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#arG)"/>
+    <rect x="860" y="498" width="280" height="58" rx="12" fill="#0F172A"/>
+    <text x="1000" y="535" text-anchor="middle" font-size="21" font-weight="700" fill="#FFFFFF">MuJoCo Go2W (6 actions)</text>
+  </g>
+
+  <defs>
+    <marker id="arG" markerWidth="10" markerHeight="10" refX="6" refY="5" orient="auto">
+      <path d="M1,1 L7,5 L1,9" stroke="#94A3B8" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <text x="1200" y="600" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="600" fill="#0B7285">github.com/Anhao1314</text>
+</svg>

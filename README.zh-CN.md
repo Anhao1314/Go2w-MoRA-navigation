@@ -1,26 +1,67 @@
-# Unitree Go2w 分层导航强化学习（MoRA-inspired）
+# Unitree Go2W 分层导航强化学习（MoRA-inspired）
+
+在 MuJoCo 中为 Unitree Go2W 实现分层导航：把学习问题收敛为“高层 PPO 指令 + 脚本底层控制”，并评估弯道跟踪、多段停靠与岔路口选路。**仅仿真（simulation-only）。**
+
+`PPO` `行为克隆 BC` `DAgger` `课程学习` `消融实验`
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.12-3776AB?logo=python&logoColor=white)](requirements.txt)
 [![MuJoCo](https://img.shields.io/badge/MuJoCo-3.11.0-0B7285)](https://mujoco.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## 项目概述
+**技术栈：** Python · PyTorch · MuJoCo · Gymnasium · Stable-Baselines3
 
-本项目在 MuJoCo 中实现 Unitree Go2w 轮腿机器人的分层导航，支持弯道跟踪、两段导航与停靠、岔路口目标分支选择。系统由规则任务决策、高层 PPO 和脚本底层控制组成，包含 PPO、BC、DAgger、课程学习的实验与评估记录。
-
-当前结果来自仓库内指定的仿真任务，尚未完成实机验证。MoRA-inspired 指对三层思想的独立工程化映射；System 2 当前采用规则决策。
-
-**阅读入口：** [了解架构](docs/ARCHITECTURE.md) · [查看实验](docs/EXPERIMENTS.md) · [运行项目](docs/USAGE.md)
+**阅读入口：** [了解架构](docs/ARCHITECTURE.md) · [查看实验](docs/EXPERIMENTS.md) · [运行项目](docs/USAGE.md) · [核验记录](docs/PORTFOLIO_VALIDATION.md)
 
 ## 代表演示
 
-下面是已归档训练策略的仿真录像，可直接查看；快速开始生成的是脚本教师轨迹，不是这些 PPO 策略。
+下面是已归档训练策略在 MuJoCo 中的仿真录像，可直接查看；快速开始生成的是脚本教师轨迹，不是这些 PPO 策略，也不包含任何实机录像。
 
 | 弯道导航 | 两段导航 A→B | 岔路口导航 |
 | --- | --- | --- |
 | ![弯道导航](media/rl_traverse_curve_high_level_seed01.gif) | ![两段导航与停靠](media/rl_traverse_curve_multi_segment_seed00_v2.gif) | ![岔路口导航](media/rl_traverse_curve_junction_seed00.gif) |
 
 [弯道 MP4](media/rl_traverse_curve_high_level_seed01.mp4) · [两段 MP4](media/rl_traverse_curve_multi_segment_seed00_v2.mp4) · [岔路口 MP4](media/rl_traverse_curve_junction_seed00.mp4)
+
+## 关键结果
+
+以下描述“规则 + 控制器 + 策略”的完整系统，**不能单独归因于 PPO**；同一批 episode 重复不等同于独立场景或独立训练种子。
+
+| 任务 | 记录结果 | 证据 |
+| --- | --- | --- |
+| 单段弯道 | **20/20 成功**，平均距离 1.355 m，**0 摔倒** | [seed01 报告](reports/traverse_curve_high_level/seed01/report.md) |
+| 两段导航 A→B | **20/20 成功**，A 点停止 100%，平均 15.2 s，**0 摔倒** | [v2 报告](reports/traverse_curve_multi_segment/seed00_v2/report.md) |
+| 岔路口 A/B | **40/40 成功**，分支正确 100%，平均 7.0 s，**0 摔倒** | [岔路口报告](reports/traverse_curve_junction/seed00/report.md) |
+| 质量检查（2026-09-12） | **196 通过 / 1 跳过**（共发现 197）；Pyright 0 错误 | [范围与环境](docs/PORTFOLIO_VALIDATION.md) |
+
+首页成功 PPO 演示对应的最终权重与完整训练日志**不在当前快照中**，复现需要重新训练，证据边界见下文[已知限制](#已知限制)。
+
+## 项目概述（为什么这样设计）
+
+直接从 61 维观测学习 6 个底层动作时，记录的弯道实验中策略会原地不动或只能短距离移动。研究问题是：显式任务状态 + 更小的导航动作空间，是否能支撑更长、分阶段的任务。MoRA-inspired 指对分层思想的独立工程化映射，并非官方复现；System 2 当前采用规则决策。
+
+## 系统架构
+
+![System 2 规则选路进入 System 1 高层 PPO，再驱动 System 0 脚本控制器作用于 MuJoCo Go2W](docs/images/hierarchy.svg)
+
+- **System 2：** 在岔路口决策区将 A 映射到左分支、B 映射到右分支并锁定。
+- **System 1：** 动作接口为 `[speed_scale, turn_adjust]`；观测按任务追加目标或进度状态，PPO 由 BC 预热并经课程训练。
+- **System 0：** 使用已知路径几何和仿真位置/航向进行跟踪；多段任务包含脚本制动与停止逻辑。
+
+当前岔路口执行分支未使用 `turn_adjust`，策略实际只调节速度；系统未实现 VLM/VLA 或可学习语义规划。各层职责、观测与限制见[架构文档](docs/ARCHITECTURE.md)。
+
+## 实验结果
+
+以下为已有报告记录，并非每次重新训练的保证。距离列沿用报告指标，不代表统一的路径长度定义。
+
+| 任务 | 评估规模 | 成功率 | 报告指标 | 报告 |
+| --- | --- | --- | --- | --- |
+| 单段弯道 seed01 | 20 回合 | 100% | 平均距离 1.355 m，0 摔倒 | [弯道](reports/traverse_curve_high_level/seed01/report.md) |
+| 随机目标 B+ | 20 回合 | 90% | 平均距离 0.834 m，2 摔倒 | [B+](reports/traverse_curve_high_level_bplus/seed00/report.md) |
+| 无目标输入消融 | 20 回合 | 100% | 平均距离 1.352 m | [no-goal](reports/traverse_curve_high_level_bplus_no_goal/seed00/report.md) |
+| 两段导航 A→B | 20 回合 | 100% | A 点停止 100%，平均 15.2 s，0 摔倒 | [两段](reports/traverse_curve_multi_segment/seed00_v2/report.md) |
+| 岔路口 A/B | 40 回合（各 20） | 100% | 分支正确 100%，平均 7.0 s，0 摔倒 | [岔路口](reports/traverse_curve_junction/seed00/report.md) |
+
+课程进展图：[多段课程](docs/images/multi_segment_curriculum.png) · [岔路口课程](docs/images/junction_curriculum.png)；[弯道 BC 消融图](docs/images/curve_high_level_ablation.png)。失败实验、对照与证据差异见[实验文档](docs/EXPERIMENTS.md)。
 
 ## 快速开始
 
@@ -46,45 +87,7 @@ env.close()
 PYTHON
 ```
 
-预期维度为 `(61,)` 和 `(6,)`。生成脚本教师的弯道轨迹：
-
-```bash
-python scripts/gen_demo_trajectory.py --seed 0 --noise 0.0 --attempts 10
-```
-
-成功时保存到 `data/demo_trajectories/curve_demo_seed00.npz`，会覆盖同名样例；失败尝试保存在该目录的 `failed/` 下。轨迹是 BC 数据，不会生成视频。训练、模型评估、录像和检查命令见[使用指南](docs/USAGE.md)。
-
-## 系统架构
-
-```text
-目标 A/B → System 2：规则分支选择与锁定
-                     ↓ 分支状态
-           System 1：PPO 导航策略
-                     ↓ 速度倍率 / 转向修正
-           System 0：路径跟踪与底层控制
-                     ↓ 6 维底层动作
-                MuJoCo Go2w 环境
-```
-
-- **System 2：** 在岔路口决策区将 A 映射到左分支、B 映射到右分支。
-- **System 1：** 动作接口为 `[speed_scale, turn_adjust]`；观测按任务追加目标或进度状态。
-- **System 0：** 使用已知路径几何和仿真位置/航向进行跟踪；多段任务包含脚本制动与停止逻辑。
-
-当前岔路口执行分支未使用 `turn_adjust`，策略实际只调节速度。各层职责、观测与限制见[架构文档](docs/ARCHITECTURE.md)。
-
-## 实验结果
-
-以下为已有报告记录，并非每次重新训练的保证。距离列沿用报告指标，不代表统一的路径长度定义。
-
-| 任务 | 评估规模 | 成功率 | 报告指标 | 报告 |
-| --- | --- | --- | --- | --- |
-| 单段弯道 seed01 | 20 回合 | 100% | 平均距离 1.355 m，0 摔倒 | [弯道](reports/traverse_curve_high_level/seed01/report.md) |
-| 随机目标 B+ | 20 回合 | 90% | 平均距离 0.834 m，2 摔倒 | [B+](reports/traverse_curve_high_level_bplus/seed00/report.md) |
-| 无目标输入消融 | 20 回合 | 100% | 平均距离 1.352 m | [no-goal](reports/traverse_curve_high_level_bplus_no_goal/seed00/report.md) |
-| 两段导航 A→B | 20 回合 | 100% | A 点停止 100%，平均 15.2 s，0 摔倒 | [两段](reports/traverse_curve_multi_segment/seed00_v2/report.md) |
-| 岔路口 A/B | 40 回合（各 20） | 100% | 分支正确 100%，平均 7.0 s，0 摔倒 | [岔路口](reports/traverse_curve_junction/seed00/report.md) |
-
-配置、失败实验、消融和证据差异见[实验文档](docs/EXPERIMENTS.md)。
+预期维度为 `(61,)` 和 `(6,)`。训练、模型评估、录像、检查命令与教师轨迹生成见[使用指南](docs/USAGE.md)。
 
 ## 仓库结构与文档导航
 
@@ -103,12 +106,21 @@ python scripts/gen_demo_trajectory.py --seed 0 --noise 0.0 --attempts 10
 - [使用指南](docs/USAGE.md)：安装、演示、训练、评估、检查与常见问题。
 - [第三方声明](docs/THIRD_PARTY_NOTICES.md)：来源与许可说明。
 
+## 质量检查
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py'
+pyright rl scripts mujoco_demos
+```
+
+[CI](.github/workflows/ci.yml) 会在 Linux 上安装依赖、运行测试并检查上述源码目录；工作流文件本身不等于 CI 已通过，请以实际 Actions 运行为准。当前计数属于对应一次实际运行，并非永久徽章。
+
 ## 已知限制
 
 - 当前使用仿真状态与已知路径，没有验证真实传感、实机控制或开放场景泛化。
 - 分支选择与部分停靠行为由脚本完成；结果描述整个系统，不能直接归因于 PPO。
-- 评估场景与样本有限，100% 仅表示对应批次全部成功。
-- `rl/runs/` 未提交；首页成功 PPO 演示对应的模型与归一化文件不在当前快照中，需按指南训练生成。已提交 BC 模型不等同于最终 PPO 模型。
+- 评估场景与样本有限，100% 仅表示对应批次全部成功；未做独立留出场景/多种子验证。
+- `rl/runs/` 未提交；成功 PPO 演示对应的最终权重与归一化文件不在当前快照中，需按指南训练生成，已提交 BC 模型不等同于最终 PPO 模型。
 
 ## 许可证
 

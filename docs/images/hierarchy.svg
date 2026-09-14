@@ -1,0 +1,65 @@
+<svg width="960" height="448" viewBox="0 0 960 448" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <rect width="960" height="430" rx="14" fill="#FFFFFF"/>
+
+  <!-- legend -->
+  <g font-size="15">
+    <rect x="40" y="28" width="16" height="16" rx="4" fill="#0B7285"/>
+    <text x="64" y="41" fill="#475569">Learned (RL / imitation)</text>
+    <rect x="270" y="28" width="16" height="16" rx="4" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.6"/>
+    <text x="294" y="41" fill="#475569">Scripted (rule / controller)</text>
+    <text x="920" y="41" text-anchor="end" fill="#94A3B8" font-family="ui-monospace, Menlo, monospace" font-size="14">MoRA-inspired · independent mapping</text>
+  </g>
+
+  <!-- inputs -->
+  <g>
+    <rect x="60" y="92" width="220" height="64" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.6"/>
+    <text x="170" y="120" text-anchor="middle" font-size="17" font-weight="600" fill="#334155">Target A / B</text>
+    <text x="170" y="142" text-anchor="middle" font-size="14" fill="#64748B">navigation goal</text>
+
+    <rect x="60" y="300" width="220" height="64" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.6"/>
+    <text x="170" y="326" text-anchor="middle" font-size="16.5" font-weight="600" fill="#334155">MuJoCo state + path</text>
+    <text x="170" y="348" text-anchor="middle" font-size="14" fill="#64748B">61-dim observation</text>
+  </g>
+
+  <!-- main column -->
+  <g>
+    <rect x="360" y="78" width="300" height="78" rx="10" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.8"/>
+    <text x="510" y="110" text-anchor="middle" font-size="18" font-weight="700" fill="#0F172A">System 2 · branch selection</text>
+    <text x="510" y="136" text-anchor="middle" font-size="14.5" fill="#64748B">rule-based, locks A/B branch</text>
+
+    <path d="M510 156 L510 182" stroke="#94A3B8" stroke-width="2.2" marker-end="url(#ah)"/>
+
+    <rect x="360" y="186" width="300" height="78" rx="10" fill="#0B7285"/>
+    <text x="510" y="218" text-anchor="middle" font-size="18" font-weight="700" fill="#FFFFFF">System 1 · high-level PPO</text>
+    <text x="510" y="244" text-anchor="middle" font-size="14.5" fill="#CCFBF1">BC warm-start · DAgger · curriculum</text>
+
+    <path d="M510 264 L510 290" stroke="#94A3B8" stroke-width="2.2" marker-end="url(#ah)"/>
+
+    <rect x="360" y="294" width="300" height="78" rx="10" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.8"/>
+    <text x="510" y="326" text-anchor="middle" font-size="18" font-weight="700" fill="#0F172A">System 0 · low-level controller</text>
+    <text x="510" y="352" text-anchor="middle" font-size="14.5" fill="#64748B">lookahead / differential drive</text>
+  </g>
+
+  <!-- input arrows -->
+  <path d="M280 124 L352 124" stroke="#CBD5E1" stroke-width="2.2" marker-end="url(#ahl)"/>
+  <path d="M280 332 L352 332" stroke="#CBD5E1" stroke-width="2.2" marker-end="url(#ahl)"/>
+
+  <!-- output -->
+  <path d="M660 333 L732 333" stroke="#94A3B8" stroke-width="2.2" marker-end="url(#ah)"/>
+  <rect x="736" y="294" width="178" height="78" rx="10" fill="#0F172A"/>
+  <text x="825" y="326" text-anchor="middle" font-size="17" font-weight="700" fill="#FFFFFF">6 low-level</text>
+  <text x="825" y="350" text-anchor="middle" font-size="17" font-weight="700" fill="#FFFFFF">actions</text>
+
+  <!-- footnote -->
+  <text x="360" y="408" font-size="14.5" fill="#64748B">Junction steering uses teacher geometry and ignores</text>
+  <text x="360" y="430" font-size="14.5" fill="#64748B"><tspan font-family="ui-monospace, Menlo, monospace" fill="#475569">turn_adjust</tspan>; no VLM/VLA or learned semantic planner.</text>
+
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto">
+      <path d="M1,1 L7,4.5 L1,8" stroke="#94A3B8" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="ahl" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto">
+      <path d="M1,1 L7,4.5 L1,8" stroke="#CBD5E1" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+</svg>
