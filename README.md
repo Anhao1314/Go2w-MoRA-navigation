@@ -8,6 +8,28 @@ Hierarchical navigation for the Unitree Go2W in MuJoCo: reduce the learning prob
 
 [中文](README.zh-CN.md) · [Architecture](docs/ARCHITECTURE.md) · [Experiments](docs/EXPERIMENTS.md) · [Reproduction guide](docs/USAGE.md) · [Validation record](docs/PORTFOLIO_VALIDATION.md) · [MIT](LICENSE)
 
+## Experiment integrity update (2026-10-06)
+
+The new `navigation-integrity-v1` path fixes wrapper seeding, double normalization
+between curriculum stages, per-episode metric counting and accidental historical
+report overwrites. Run configurations record source revision, installed versions,
+input hashes and evaluation seeds. **Archived results below have not been rerun by
+this update.** See [changes, commands and remaining issues](docs/INTEGRITY_UPGRADE.md).
+
+After installing the dependencies, evaluate the controller-only baseline without
+training or downloading a policy:
+
+```bash
+python scripts/evaluate_navigation.py --task multi-segment --method controller --episodes 20
+python scripts/evaluate_navigation.py --task junction --method controller --episodes 40
+```
+
+Each command creates a new run directory containing `run_config.json`,
+`episodes.json` and `summary.json`. Use `--method ppo --checkpoint ...
+--normalization ...` only with a matching trusted checkpoint pair. Missing files
+are errors, not a reason to substitute BC weights or invented results. The tasks
+still use fixed scenes: disjoint episode seeds **do not establish generalization**.
+
 ## Demo
 
 Archived trained policies running in MuJoCo. The quick-start teacher trajectories are a different artifact, and no real-robot footage is claimed.
@@ -16,7 +38,7 @@ Archived trained policies running in MuJoCo. The quick-start teacher trajectorie
 | --- | --- | --- |
 | ![Curve policy](media/rl_traverse_curve_high_level_seed01.gif) | ![Multi-stage policy](media/rl_traverse_curve_multi_segment_seed00_v2.gif) | ![Junction policy](media/rl_traverse_curve_junction_seed00.gif) |
 
-## Key Results
+## Key Results (archived)
 
 These describe the complete rule/controller/policy system, **not PPO alone**; episode-seed repetition is not equivalent to independent scenes or training seeds.
 
@@ -112,7 +134,7 @@ python scripts/train_high_level_curve.py \
   --report-only --run-dir rl/runs/traverse_curve_high_level/seed01
 ```
 
-For multi-stage/junction teacher generation, BC warm-start, staged training, smoke runs and video recording, follow the [full guide](docs/USAGE.md). Teacher generation and reporting may overwrite same-named samples/reports: use an isolated clone or back up historical artifacts. Dependencies partly use version ranges; save the exact environment and run configuration for each experiment. Historical results are reference observations, not retraining guarantees.
+For updated curriculum output locations and recording, [the integrity guide](docs/INTEGRITY_UPGRADE.md) takes precedence over historical paths. For multi-stage/junction teacher generation, BC warm-start, staged training, smoke runs and video recording, follow the [full guide](docs/USAGE.md). Teacher generation and reporting may overwrite same-named samples/reports: use an isolated clone or back up historical artifacts. Dependencies partly use version ranges; save the exact environment and run configuration for each experiment. Historical results are reference observations, not retraining guarantees.
 
 ## Project Structure
 
