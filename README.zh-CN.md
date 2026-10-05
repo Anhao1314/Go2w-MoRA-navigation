@@ -122,6 +122,11 @@ pyright rl scripts mujoco_demos
 - 评估场景与样本有限，100% 仅表示对应批次全部成功；未做独立留出场景/多种子验证。
 - `rl/runs/` 未提交；成功 PPO 演示对应的最终权重与归一化文件不在当前快照中，需按指南训练生成，已提交 BC 模型不等同于最终 PPO 模型。
 
+## 贡献者
+
+- **Anhao1314** — 项目负责人；原始系统、实验、机器人/RL 实现与归档证据。
+- **ChatGPT（OpenAI）** — AI 协作贡献：仓库审计、[实验完整性重构](https://github.com/Anhao1314/go2w-MoRA-navigation/pull/1)、可复现评估/测试设计与文档改进。该署名不对应独立 GitHub 账号，也不表示独立作者身份。
+
 ## 许可证
 
 自研代码采用 [MIT License](LICENSE)。Go2w 模型许可见 [models/go2w/LICENSE](models/go2w/LICENSE)，其他来源见[第三方声明](docs/THIRD_PARTY_NOTICES.md)。

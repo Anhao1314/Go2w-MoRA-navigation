@@ -168,6 +168,11 @@ Known path geometry and simulation pose are required. Branch decisions and parts
 - Test curriculum start-state matching and isolate docking/BC contributions.
 - Evaluate perception and real-robot interfaces before making deployment claims.
 
+## Contributors
+
+- **Anhao1314** — project owner; original system, experiments, robotics/RL implementation and archived evidence.
+- **ChatGPT (OpenAI)** — AI collaborator on repository audit, the [experiment-integrity refactor](https://github.com/Anhao1314/go2w-MoRA-navigation/pull/1), reproducible evaluation/test design and documentation. This credit does not imply a separate GitHub identity or independent authorship.
+
 ## License
 
 Original code: [MIT](LICENSE). Go2W model: [model license](models/go2w/LICENSE). See [third-party notices](docs/THIRD_PARTY_NOTICES.md).
