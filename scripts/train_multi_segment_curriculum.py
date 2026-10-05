@@ -1,6 +1,6 @@
 """多段路径（A→B）三阶段课程学习：段1→A、段2→B、完整 A→B。
 
-阶段1用 BC 预热模型初始化，阶段2/3 用上一阶段 best 初始化。
+阶段1/2 分别用对应 BC 预热模型初始化，阶段3 用阶段2 的 best 初始化。
 """
 
 from __future__ import annotations
@@ -31,6 +31,10 @@ from mujoco_demos import common  # noqa: E402
 from rl.go2w_env import MODEL_SCENARIO_PATH, Go2wEnv  # noqa: E402
 from rl.eval import save_video  # noqa: E402
 from rl.high_level_env_wrapper import HighLevelEnvWrapper  # noqa: E402
+from rl.experiment_io import (  # noqa: E402
+    PROTOCOL_VERSION, acceptance_seeds, fingerprint, start_run, write_json_new,
+)
+from rl.normalization import normalize_once  # noqa: E402
 from rl.train import (  # noqa: E402
     NormFreezeCallback,
     make_lr_schedule,
@@ -178,27 +182,33 @@ class MsegEvalCallback(BaseCallback):
         passed = 0
         for ep in range(EVAL_EPISODES):
             env = make_stage_env(self.scope, self.start_a)
-            obs, info = env.reset(seed=ep)
-            ep_rew = 0.0
-            steps = 0
-            max_x = 0.0
-            while True:
-                obs_n = self.eval_norm.normalize_obs(obs)
-                action, _ = self.model.predict(obs_n, deterministic=True)
-                obs, r, term, trunc, info = env.step(action)
-                ep_rew += float(r)
-                steps += 1
-                max_x = max(max_x, float(info.get("progress", info.get("x", 0.0))))
-                if info.get("passed_subgoal"):
-                    passed += 1
-                if info.get("goal"):
-                    succ += 1
-                if term or trunc:
-                    break
-            rewards.append(ep_rew)
-            lengths.append(steps)
-            xs.append(max_x)
-            env.close()
+            try:
+                obs, info = env.reset(seed=ep)
+                ep_rew = 0.0
+                steps = 0
+                max_x = 0.0
+                ep_success = False
+                ep_passed = False
+                while True:
+                    obs_n = self.eval_norm.normalize_obs(obs)
+                    action, _ = self.model.predict(obs_n, deterministic=True)
+                    obs, r, term, trunc, info = env.step(action)
+                    ep_rew += float(r)
+                    steps += 1
+                    max_x = max(max_x, float(info.get("progress", info.get("x", 0.0))))
+                    if info.get("passed_subgoal"):
+                        ep_passed = True
+                    if info.get("goal"):
+                        ep_success = True
+                    if term or trunc:
+                        break
+                passed += int(ep_passed)
+                succ += int(ep_success)
+                rewards.append(ep_rew)
+                lengths.append(steps)
+                xs.append(max_x)
+            finally:
+                env.close()
         return {
             "mean_reward": float(np.mean(rewards)),
             "mean_ep_len": float(np.mean(lengths)),
@@ -213,46 +223,62 @@ def load_norm_dict(path: pathlib.Path) -> dict:
         return pickle.load(f)
 
 
-def final_acceptance(model: PPO, vec: VecNormalize, episodes: int = 20) -> dict:
+def final_acceptance(
+    model: Any, vec: Any, episodes: int = 20, seed_start: int = 1000
+) -> dict:
     succ = 0
     passed = 0
     xs: list[float] = []
     lens: list[int] = []
     times: list[float] = []
-    falls = 0
-    for ep in range(episodes):
+    failed_terminations = 0
+    records: list[dict] = []
+    for ep, eval_seed in enumerate(acceptance_seeds(episodes, seed_start)):
         env = make_stage_env(scope=2, start_a=False)
-        obs, info = env.reset(seed=ep)
-        steps = 0
-        max_x = 0.0
-        ep_passed = False
-        while True:
-            obs_n = vec.normalize_obs(obs)
-            action, _ = model.predict(obs_n, deterministic=True)
-            obs, _r, term, trunc, info = env.step(action)
-            steps += 1
-            max_x = max(max_x, float(info.get("progress", info.get("x", 0.0))))
-            if info.get("passed_subgoal"):
-                ep_passed = True
-            if info.get("goal"):
-                succ += 1
-            if term or trunc:
-                break
-        xs.append(max_x)
-        lens.append(steps)
-        times.append(float(env.base_env.data.time))
-        if ep_passed:
-            passed += 1
-        if term and not trunc and not info.get("goal"):
-            falls += 1
-        env.close()
+        try:
+            obs, info = env.reset(seed=eval_seed)
+            steps = 0
+            ep_success = False
+            max_x = 0.0
+            ep_passed = False
+            while True:
+                obs_n = vec.normalize_obs(obs)
+                action, _ = model.predict(obs_n, deterministic=True)
+                obs, _r, term, trunc, info = env.step(action)
+                steps += 1
+                max_x = max(max_x, float(info.get("progress", info.get("x", 0.0))))
+                if info.get("passed_subgoal"):
+                    ep_passed = True
+                if info.get("goal"):
+                    ep_success = True
+                if term or trunc:
+                    break
+            succ += int(ep_success)
+            xs.append(max_x)
+            lens.append(steps)
+            times.append(float(env.base_env.data.time))
+            if ep_passed:
+                passed += 1
+            if term and not trunc and not info.get("goal"):
+                failed_terminations += 1
+            records.append({
+                "seed": eval_seed, "success": ep_success,
+                "max_progress": max_x, "steps": steps,
+                "time_seconds": float(env.base_env.data.time),
+                "terminated": bool(term), "truncated": bool(trunc),
+                "a_stop": ep_passed,
+            })
+        finally:
+            env.close()
     return {
         "success_rate": succ / episodes,
         "a_stop_rate": passed / episodes,
         "mean_x": float(np.mean(xs)),
         "mean_ep_len": float(np.mean(lens)),
         "mean_time": float(np.mean(times)),
-        "falls": falls,
+        "failed_terminations": failed_terminations,
+        "episodes": episodes,
+        "episode_records": records,
     }
 
 
@@ -272,6 +298,7 @@ def record_demo(model: PPO, vec: VecNormalize, prefix: pathlib.Path) -> None:
         step += 1
         if term or trunc or step >= 4000:
             break
+    renderer.close()
     env.close()
     save_video(frames, prefix)
 
@@ -280,7 +307,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="多段路径三阶段课程学习")
     parser.add_argument("--envs", type=int, default=4)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--run-root", type=str, default=str(RUN_ROOT))
+    parser.add_argument("--run-root", type=str, default=None,
+                        help="New output directory; existing directories are rejected")
+    parser.add_argument("--record", action="store_true", help="Record a run-local demo")
     parser.add_argument("--bc-model", type=str,
                         default=str(PROJECT_ROOT / "data" / "demo_trajectories" / "multi_segment_bc_pretrain.zip"))
     parser.add_argument("--bc-norm", type=str,
@@ -292,9 +321,30 @@ def main() -> None:
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
 
-    run_root = pathlib.Path(args.run_root)
     n_envs = 2 if args.smoke else args.envs
-    stage_steps_scale = 10_000 if args.smoke else None
+    if n_envs < 1 or args.seed < 0:
+        parser.error("envs must be positive and seed non-negative")
+    eval_episodes = 2 if args.smoke else 20
+    config = {
+        "task": "traverse_curve_multi_segment", "seed": args.seed,
+        "envs": n_envs, "smoke": args.smoke, "record": args.record,
+        "observation_dim": 67, "action_dim": 2,
+        "domain_randomize": False, "stages": STAGES,
+        "smoke_steps_per_stage": 10000 if args.smoke else None,
+        "validation_seeds": list(range(EVAL_EPISODES)),
+        "acceptance_seeds": acceptance_seeds(eval_episodes),
+        "normalization_layers": 1, "ent_coef": 0.005,
+        "learning_rate": {"start": 5e-5, "end": 1.5e-4,
+                          "warmup_steps": 1000 if args.smoke else 100000},
+        "distribution": "fixed_scene_repetition_not_generalization",
+    }
+    run_root = start_run(
+        PROJECT_ROOT, "traverse_curve_multi_segment", config,
+        {"bc_model": args.bc_model, "bc_norm": args.bc_norm,
+         "stage2_bc_model": args.stage2_bc_model, "stage2_bc_norm": args.stage2_bc_norm},
+        requested=args.run_root,
+    )
+    report_dir = run_root / ("smoke_evaluation" if args.smoke else "evaluation")
     prev_best = None
     prev_norm = None
 
@@ -311,15 +361,14 @@ def main() -> None:
             })(),
             steps,
         )
-        train_env = make_vec_env(
+        raw_env = make_vec_env(
             lambda: make_stage_env(stage["scope"], stage["start_a"]),
             n_envs=n_envs,
             seed=args.seed,
             vec_env_cls=DummyVecEnv,
         )
-        train_env = VecNormalize(
-            train_env, norm_obs=True, norm_reward=False, clip_obs=10.0
-        )
+        restore_norm = prev_norm if stage["name"] == "stage3" else None
+        train_env = normalize_once(raw_env, checkpoint=restore_norm)
         if stage["name"] == "stage1":
             nd = load_norm_dict(pathlib.Path(args.bc_norm))
             obs_rms: Any = train_env.obs_rms
@@ -327,7 +376,7 @@ def main() -> None:
             obs_rms.var = np.asarray(nd["var"], dtype=np.float32)
             obs_rms.count = float(nd.get("count", 1e4))
             model = PPO.load(args.bc_model, env=train_env, device="cpu",
-                             learning_rate=lr)
+                             learning_rate=lr, seed=args.seed)
         elif stage["name"] == "stage2":
             nd = load_norm_dict(pathlib.Path(args.stage2_bc_norm))
             obs_rms: Any = train_env.obs_rms
@@ -335,14 +384,11 @@ def main() -> None:
             obs_rms.var = np.asarray(nd["var"], dtype=np.float32)
             obs_rms.count = float(nd.get("count", 1e4))
             model = PPO.load(args.stage2_bc_model, env=train_env, device="cpu",
-                             learning_rate=lr)
+                             learning_rate=lr, seed=args.seed)
         else:
             assert prev_best is not None and prev_norm is not None
-            train_env = VecNormalize.load(str(prev_norm), train_env)
-            train_env.training = True
-            train_env.norm_reward = False
             model = PPO.load(str(prev_best), env=train_env, device="cpu",
-                             learning_rate=lr)
+                             learning_rate=lr, seed=args.seed)
         model.ent_coef = 0.005
         model.tensorboard_log = str(stage_dir / "tensorboard")
         cb = MsegEvalCallback(
@@ -373,28 +419,38 @@ def main() -> None:
             if best.exists()
             else stage_dir / "final_vec_normalize.pkl"
         )
+        cb.eval_norm.close()
+        train_env.close()
 
     # 最终验收
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    assert prev_best is not None and prev_norm is not None
+    report_dir.mkdir(parents=True, exist_ok=False)
     dummy = make_stage_env(scope=2, start_a=False)
-    vec = VecNormalize.load(str(prev_norm), DummyVecEnv([lambda: dummy]))
-    vec.training = False
+    vec = normalize_once(DummyVecEnv([lambda: dummy]), checkpoint=prev_norm, training=False)
     model = PPO.load(str(prev_best), device="cpu")
-    acc = final_acceptance(model, vec)
+    acc = final_acceptance(model, vec, episodes=eval_episodes)
+    write_json_new(report_dir / "episodes.json", acc["episode_records"])
     print("最终验收:", acc)
-    (REPORT_DIR / "metrics.csv").write_text(
-        "label,task,success_rate,a_stop_rate,mean_x,mean_ep_len,mean_time,falls\n"
+    (report_dir / "metrics.csv").write_text(
+        "label,task,success_rate,a_stop_rate,mean_x,mean_ep_len,mean_time,failed_terminations\n"
         f"RL multi-segment,traverse_curve_multi_segment,"
         f"{acc['success_rate']},{acc['a_stop_rate']},{acc['mean_x']},"
-        f"{acc['mean_ep_len']},{acc['mean_time']},{acc['falls']}\n",
+        f"{acc['mean_ep_len']},{acc['mean_time']},{acc['failed_terminations']}\n",
         encoding="utf-8",
     )
-    (REPORT_DIR / "summary.json").write_text(
+    (report_dir / "summary.json").write_text(
         json.dumps(
             {
                 "task": "traverse_curve_multi_segment",
-                "seed": 0,
-                "verdict": "pass" if acc["success_rate"] >= 0.6 else "fail",
+                "seed": args.seed,
+                "schema_version": PROTOCOL_VERSION,
+                "episodes": eval_episodes,
+                "acceptance_seeds": config["acceptance_seeds"],
+                "checkpoint": fingerprint(prev_best),
+                "normalization": fingerprint(prev_norm),
+                "verdict": "smoke_only" if args.smoke else (
+                    "pass" if acc["success_rate"] >= 0.6 else "fail"
+                ),
                 "success_rate": acc["success_rate"],
                 "distance": acc["mean_x"],
             },
@@ -403,7 +459,7 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
-    (REPORT_DIR / "report.md").write_text(
+    (report_dir / "report.md").write_text(
         "\n".join(
             [
                 "# 多段路径 A→B RL 训练报告（MoRA 三项能力验证）",
@@ -414,19 +470,20 @@ def main() -> None:
                 f"- A 点精确停止达标率：{acc['a_stop_rate']:.0%}",
                 f"- 平均距离：{acc['mean_x']:.2f}m",
                 f"- 平均 ep_len：{acc['mean_ep_len']:.0f}，平均时间：{acc['mean_time']:.1f}s",
-                f"- 摔倒次数：{acc['falls']}",
+                f"- 非成功终止次数（不等于摔倒）：{acc['failed_terminations']}",
+                "- 固定场景重复评估，不能作为泛化成功率；smoke 不构成性能验收。",
                 "",
-                "各阶段曲线见 rl/runs/traverse_curve_multi_segment/seed00_v2/stage*/eval_log.csv",
+                f"各阶段曲线见 {run_root}/stage*/eval_log.csv",
             ]
         ),
         encoding="utf-8",
     )
-    record_demo(
-        model,
-        vec,
-        PROJECT_ROOT / "media" / "rl_traverse_curve_multi_segment_seed00_v2",
-    )
-    print("报告:", REPORT_DIR / "report.md")
+    try:
+        if args.record and not args.smoke:
+            record_demo(model, vec, report_dir / "demo")
+    finally:
+        vec.close()
+    print("报告:", report_dir / "report.md")
 
 
 if __name__ == "__main__":

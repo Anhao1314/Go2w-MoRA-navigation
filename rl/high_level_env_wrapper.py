@@ -1,7 +1,8 @@
 """高层环境包装器：把 6 维底层动作压缩为 2 维导航决策。
 
-动作空间：Box([0.5, -0.5], [1.5, 0.5]) = [speed_scale, turn_adjust]。
-观测空间与底层 Go2wEnv 完全一致（61 维），奖励逻辑不变。
+动作空间：Box([0.9, -0.5], [1.5, 0.5]) = [speed_scale, turn_adjust]。
+观测：底层 61 维；目标条件 63 维；多段 67 维；岔路口 68 维。
+岔路口仍使用规则分支与教师转向，turn_adjust 不生效；未改变历史动作职责。
 """
 
 from __future__ import annotations
@@ -89,7 +90,7 @@ def relabel_episode(
     use_goal_condition: bool = True,
     rng: np.random.Generator | None = None,
 ) -> list[tuple[np.ndarray, np.ndarray, float]]:
-    """HER future relabeling：为每个 transition 采样未来目标，生成辅助样本。"""
+    """Future-goal relabeling 辅助样本；不是标准 off-policy HER 实现。"""
     rng = rng or np.random.default_rng(0)
     out: list[tuple[np.ndarray, np.ndarray, float]] = []
     n = len(transitions)
@@ -210,8 +211,13 @@ class HighLevelEnvWrapper(gym.Env[np.ndarray, np.ndarray]):
             arr[60] = 0.0
         return arr
 
+    def _reset_options(self, options: dict | None) -> dict:
+        """Subclass sampling hook, called only after this wrapper is seeded."""
+        return dict(options or {})
+
     def reset(self, *, seed: int | None = None, options: dict | None = None):
-        base_opts = dict(options or {})
+        super().reset(seed=seed)
+        base_opts = self._reset_options(options)
         if "goal_arc" in base_opts:
             goal = float(base_opts["goal_arc"])
         else:
