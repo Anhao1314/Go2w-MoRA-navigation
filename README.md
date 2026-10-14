@@ -1,178 +1,194 @@
-# Unitree Go2W Hierarchical RL Navigation (MoRA-inspired)
+# 已知路径条件下的 Unitree Go2W 分层强化学习导航：方法、实验与有效性分析
 
-Hierarchical navigation for the Unitree Go2W in MuJoCo: reduce the learning problem to high-level PPO commands over a scripted controller, and evaluate curve tracking, multi-stage docking and junction routing. **Simulation-only.**
+*Hierarchical Reinforcement Learning Navigation for Unitree Go2W: Methods, Experiments, and Validity Analysis*
 
-`PPO` `Behavior Cloning` `DAgger` `Curriculum Learning` `Ablation Studies`
+**文档性质：** 基于仓库代码及归档实验的工程研究报告（非同行评议论文）  
+**研究对象：** Unitree Go2W · MuJoCo · PPO / BC / DAgger  
+**适用范围：** 已知路径下的指定仿真任务，非真实机器人部署验证
 
-**Stack:** Python · PyTorch · MuJoCo · Gymnasium · Stable-Baselines3
+[English](README.en.md) · [架构与接口](docs/ARCHITECTURE.md) · [实验报告索引](docs/EXPERIMENTS.md) · [复现指南](docs/USAGE.md) · [完整性升级说明](docs/INTEGRITY_UPGRADE.md)
 
-[中文](README.zh-CN.md) · [Architecture](docs/ARCHITECTURE.md) · [Experiments](docs/EXPERIMENTS.md) · [Reproduction guide](docs/USAGE.md) · [Validation record](docs/PORTFOLIO_VALIDATION.md) · [MIT](LICENSE)
+## 摘要
 
-## Experiment integrity update (2026-10-06)
+**背景：** 在本项目归档的弯道任务中，使用 61 维观测直接学习 6 维底层动作的 PPO 策略，出现原地停滞、移动距离短或任务失败等问题。**目的：** 探索已知路径条件下，通过分层控制降低策略学习难度、支持更长程和多阶段导航任务的可行性。**方法：** 将规则目标决策（System 2）、学习型高层导航指令（System 1）以及脚本路径跟踪和 PD 执行（System 0）组合，并记录 PPO、行为克隆（BC）、DAgger、课程学习和探索性对照实验。**结果：** 在各自的历史固定仿真协议下，完整系统的弯道、多段 A→B 和岔路任务分别记录 **20/20、20/20、40/40** 成功；同时保留单层 PPO、部分 BC/DAgger 实验和多段初版的失败记录。**结论：** 现有证据支持分层**完整系统**在指定任务中的可行性，但尚不能单独归因 PPO、BC 或某个改动的收益，也不足以证明未知场景泛化或真实机器人可靠性。
 
-The new `navigation-integrity-v1` path fixes wrapper seeding, double normalization
-between curriculum stages, per-episode metric counting and accidental historical
-report overwrites. Run configurations record source revision, installed versions,
-input hashes and evaluation seeds. **Archived results below have not been rerun by
-this update.** See [changes, commands and remaining issues](docs/INTEGRITY_UPGRADE.md).
+**关键词：** 分层控制；机器人导航；强化学习；PPO；模仿学习；MuJoCo；实验可复核性
 
-After installing the dependencies, evaluate the controller-only baseline without
-training or downloading a policy:
+## 1. 引言与研究问题
+
+机器人在弯道和连续任务中运动，既要保持自身稳定，又要沿路线调整方向、控制速度并在目标点停下。如果把这些责任全部交给一个底层强化学习策略，学习过程就可能陷入“不动”“乱动”或“无法稳定完成目标”的局部方案。本项目的早期实验确实记录了类似结果，参见[负结果总览](docs/EXPERIMENTS.md)。
+
+这项研究不尝试发明新的 PPO 算法，而是提出一个**系统工程假设**：把已知的路径跟踪与制动能力留给传统控制器，让学习策略只负责少量导航调整，并向它提供明确的任务目标和进度。
+
+具体研究三个问题：
+
+- **RQ1：** 规则决策、PPO 和传统控制构成的分层系统，能否完成指定的弯道、多段停靠和岔路导航任务？
+- **RQ2：** 原地停滞、终点过冲与阶段训练失败，提示了哪些动作接口、奖励设计和状态分布问题？
+- **RQ3：** 现有实验能否将 PPO、BC、DAgger 和脚本控制器的**独立贡献**可靠地区分开？
+
+**命名与范围边界：** `MoRA-inspired` 指独立借鉴分层思想的工程实现，并非官方 MoRA 模型或训练流程复现。当前 System 2 是规则模块，没有实现学习型 VLM/VLA、语义规划或开放场景导航；仓库也没有真实 Go2W 的部署结果。
+
+## 2. 方法
+
+### 2.1 仿真环境与任务
+
+本研究使用 [`Go2wEnv`](rl/go2w_env.py) 封装 MuJoCo 机器人模型、Gymnasium 状态/动作接口、奖励、终止条件和任务进度。主要任务是单段弯道、带 A 点停靠的多段 A→B 导航，以及已知目标 A/B 的岔路导航。
+
+当前代码中物理步长为 **0.002 秒（500 Hz）**；每 5 个物理步更新一次策略指令，即 **100 Hz**。这描述的是仿真设置，而不是实机 SDK 控制频率。
+
+底层穿越环境的动作接口是 6 维：**前四维是四轮力矩相关命令，后两维是前后腿组姿态命令**。原始观测包含机器人姿态、角速度、轮速、腿关节状态、历史动作以及导航状态等。实现参见[环境代码](rl/go2w_env.py)。
+
+### 2.2 分层控制结构
+
+```text
+已知目标 / 任务状态
+  ↓
+System 2：规则目标与岔路选择（A→左、B→右）
+  ↓
+System 1：PPO MLP → [speed_scale, turn_adjust]
+  ↓
+System 0：前视路径跟踪 + 差速转向 + 脚本停靠 / 腿部 PD 控制
+  ↓
+MuJoCo：执行动作 → 返回状态、奖励、任务结果
+  └──────────────────→ 更新下一步决策
+```
+
+| 层级 | 具体实现 | 主要职责 | 源代码 |
+| --- | --- | --- | --- |
+| System 2 | 规则映射与决策区分支锁定 | 将 A/B 任务目标映射到左/右岔路 | [高层包装器](rl/high_level_env_wrapper.py) |
+| System 1 | Stable-Baselines3 PPO，MLP `[256, 256]` | 输出 2 维导航指令 | [高层 PPO 训练](scripts/train_high_level_curve.py) |
+| System 0 | 已知路径前视点跟踪、差速和脚本/PD 控制 | 将导航指令转换为实际底层动作 | [底层控制器](rl/low_level_controller.py)、[环境](rl/go2w_env.py) |
+
+**观测空间：** 基础为 61 维；附加目标条件后为 63 维，多段任务为 67 维，岔路任务为 68 维。额外信息分别包含目标距离/方向、任务阶段或已选分支状态。
+
+**动作空间：** 高层输出 `[speed_scale, turn_adjust]`，当前范围分别为 **[0.9, 1.5]** 和 **[-0.5, 0.5]**，由底层控制器展开为 6 维执行动作；正常导航的速度倍率下界不同于脚本制动或零动作。
+
+**关键限制：** 岔路的“往左还是往右”由规则决定，实际转向使用已知路径的脚本教师几何；当前岔路分支**未使用高层策略的 `turn_adjust`**，学习策略主要改变速度。多段停靠也具有显式的脚本行为。不能将全部岔路决策、转向和刹车声称为 PPO 自主学会的能力。
+
+### 2.3 策略训练与实验方法
+
+| 方法 | 实际作用 | 对应入口 |
+| --- | --- | --- |
+| PPO [1] | 最初的单层基线，以及后续分层导航策略学习 | [低层训练](rl/train.py)、[高层训练](scripts/train_high_level_curve.py) |
+| BC（行为克隆） | 用脚本教师演示的状态—动作对做监督学习，为部分课程阶段初始化策略 | [BC](scripts/bc_pretrain.py)、[多段 BC](scripts/bc_pretrain_multi_segment.py) |
+| DAgger [2] | 在当前策略访问的偏差状态中收集教师纠正，再加入训练集迭代学习 | [DAgger](scripts/dagger_train.py) |
+| 课程学习 | 先到 A，再从 A 到 B，最后完成整个 A→B 任务 | [多段课程](scripts/train_multi_segment_curriculum.py)、[岔路课程](scripts/train_junction_curriculum.py) |
+
+奖励函数随任务版本变化，主要涉及前进进度、航向与横向偏差、稳定性、子目标到达和失败惩罚等。不同实验不能简单视为使用同一个 Reward Function；精确逻辑应以[`_get_reward` 实现](rl/go2w_env.py)和对应归档配置为准。
+
+在多段任务中，**A 点停靠**的判定包含位置容差约 0.15 m、速度低于 0.2 m/s 和持续 0.3 秒；但**B 点**的完成逻辑是进入终点范围后结束回合，并没有独立验证与 A 点相同的静止保持条件。这一区别影响对“精确停靠”结果的解释。
+
+### 2.4 评价指标与证据口径
+
+归档报告使用任务成功率、进度/距离指标、回合用时、摔倒次数、A 点停靠和岔路分支正确率等指标。以下全部结果来自历史 `reports/` 和 `data/demo_trajectories/` 文件，**不是本次文档改造重新训练出来的结果**。
+
+需要区分：一次实验内更换 episode seed、独立训练多次以及测试新的场景分布，是三种不同强度的验证。现有多数成功结果只覆盖第一种。
+
+<a id="final-results"></a>
+## 3. 归档实验结果
+
+| 实验 | 记录结果 | 解释范围 | 证据 |
+| --- | --- | --- | --- |
+| 早期单层 PPO | 未达标 | 站桩或短程移动（记录至多约 0.7 m） | [实验总览](docs/EXPERIMENTS.md) |
+| 分层弯道 `seed00` | **0/20** | 策略选择速度下界 0.5，无法有效前进 | [失败报告](reports/traverse_curve_high_level/seed00/report.md) |
+| 分层弯道 `seed01` | **20/20** | 平均报告进度 1.355 m，0 摔倒 | [弯道报告](reports/traverse_curve_high_level/seed01/report.md) |
+| 多段 A→B 初版 | **0%** | 过冲目标点，完整任务未达标 | [初版报告](reports/traverse_curve_multi_segment/seed00/report.md) |
+| 多段 A→B `v2` | **20/20** | A 点停靠 100%，平均 15.2 秒，0 摔倒 | [v2 报告](reports/traverse_curve_multi_segment/seed00_v2/report.md) |
+| 岔路 A/B | **40/40** | 按规则选路正确率 100%，平均 7.0 秒，0 摔倒 | [岔路报告](reports/traverse_curve_junction/seed00/report.md) |
+| B+ 随机目标 | **18/20** | 2 次摔倒；只覆盖该随机目标协议 | [B+ 报告](reports/traverse_curve_high_level_bplus/seed00/report.md) |
+
+**报告口径提醒：** 部分“平均距离”来自代码中的进度指标，并非统一定义的物理路程；历史弯道弧长公式还有待版本化修正。因此不能把不同报告的米数直接做物理路程比较，详见[完整性说明](docs/INTEGRITY_UPGRADE.md)。
+
+仿真演示作为补充材料，而非独立证据：[弯道录像](media/rl_traverse_curve_high_level_seed01.mp4) · [多段录像](media/rl_traverse_curve_multi_segment_seed00_v2.mp4) · [岔路录像](media/rl_traverse_curve_junction_seed00.mp4)。它们全部是 **MuJoCo 视频，不是真机录像**。
+
+## 4. 负结果、对照与讨论
+
+### 4.1 BC 与 DAgger 是否改善了训练？
+
+[BC 初始化与随机初始化对照](data/demo_trajectories/bc_ablation_report.md)在归档的 0.5M 步实验中都只有 **0% 成功率**。两组学习率和训练种子不同，因此这只能叫探索性比较，**不能证明 BC 的独立作用，更不能证明 BC 普遍无效**。
+
+[DAgger 纠正实验](data/demo_trajectories/dagger_training_report.md)完成五轮纠正，最好一轮移动指标约 0.915 m，但成功率仍为 **0%**。教师在接近摔倒的状态下可能不能提供有效恢复动作，或纠正数据改变了训练分布；这些是需要再检验的解释，不是已证实的因果结论。
+
+### 4.2 “分层后成功”能证明什么？
+
+早期单层 PPO 训练失败，后来分层弯道 `seed01` 成功，说明**这一版本的完整方案能够完成被测任务**。但架构、动作约束和学习设置一起改变，并未做完全统一条件的多种子对照，因此不能据此量化“分层”这个单独变量的收益。
+
+多段初版完成率为 0%，v2 为 20/20；v2 同时调整了停靠奖励、过冲惩罚、终止逻辑和阶段 BC。结论同样是**整体改造后的结果成立，单项增益尚无独立证据**。
+
+### 4.3 一个必须保留的强基线
+
+[多段导航脚本控制器验证](data/demo_trajectories/multi_segment_validation_report.md)本身已记录 **20/20 成功**。这说明最终系统的导航能力很大程度上依赖已有路径跟踪和停靠机制；不能把最终 20/20 都归功于 PPO。另一方面，脚本基线与学习型方案并非严格同协议、同种子的成对比较，也不能草率得出“PPO 完全没有价值”的结论。
+
+### 4.4 历史 HER 文案不能直接引用为结论
+
+B+ 历史报告的配置显示 HER 关闭，但文本结论出现过 HER 有效的表述。代码中的 future-goal relabeling 加 actor 辅助 MSE 也**不是标准 off-policy HER**。本研究不将这些报告作为标准 HER 收益的证据，详见[实验记录](docs/EXPERIMENTS.md)和[完整性报告](docs/INTEGRITY_UPGRADE.md)。
+
+## 5. 有效性威胁与局限
+
+<a id="limitations"></a>
+
+1. **内部有效性：** 奖励、动作接口、初始化与课程阶段可能同时变化，缺少完备的单因素消融。
+2. **统计有效性：** 20/20、40/40 只描述各自归档批次；回合种子不是独立训练种子，历史阶段评价与最终验收种子曾有重叠。
+3. **外部有效性：** 路径几何和仿真位姿已知；多段与岔路实验未启用域随机化，尚无未见地形、真实传感输入与 Sim-to-Real 测试。
+4. **测量有效性：** 进度指标与实际物理路程并不总等价；A 点停靠和 B 点到达使用不同判据。
+5. **结果可复现性：** 成功 PPO 策略的最终 checkpoint、匹配归一化统计和完整训练日志未包含在当前公开快照中；现有代码、精选数据、录像和报告**不等于无需重新训练即可复现成功策略**。
+6. **能力边界：** 规则模块、教师转向和部分制动是脚本逻辑；没有学习型 System 2、开放世界视觉导航或真实机器人的安全认证。
+
+## 6. 复现与实验完整性
+
+推荐 Python 3.10 或 3.12，在 **Linux / WSL2 的 Linux 文件系统**中运行。仓库第三方 Go2W 资产存在只在大小写上不同的文件名，常见 macOS/Windows 文件系统可能无法完整检出。具体要求见[使用指南](docs/USAGE.md)。
+
+```bash
+git clone https://github.com/Anhao1314/Go2w-MoRA-navigation.git
+cd Go2w-MoRA-navigation
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+python - <<'PY'
+from rl.go2w_env import Go2wEnv
+env = Go2wEnv(task="traverse_curve", domain_randomize=False)
+obs, _ = env.reset(seed=0)
+print(obs.shape, env.action_space.shape)  # (61,), (6,)
+env.close()
+PY
+```
+
+**无需训练或下载策略的现行控制器基线：**
 
 ```bash
 python scripts/evaluate_navigation.py --task multi-segment --method controller --episodes 20
 python scripts/evaluate_navigation.py --task junction --method controller --episodes 40
 ```
 
-Each command creates a new run directory containing `run_config.json`,
-`episodes.json` and `summary.json`. Use `--method ppo --checkpoint ...
---normalization ...` only with a matching trusted checkpoint pair. Missing files
-are errors, not a reason to substitute BC weights or invented results. The tasks
-still use fixed scenes: disjoint episode seeds **do not establish generalization**.
-
-## Demo
-
-Archived trained policies running in MuJoCo. The quick-start teacher trajectories are a different artifact, and no real-robot footage is claimed.
-
-| Curve navigation | Multi-stage A→B | Junction A/B routing |
-| --- | --- | --- |
-| ![Curve policy](media/rl_traverse_curve_high_level_seed01.gif) | ![Multi-stage policy](media/rl_traverse_curve_multi_segment_seed00_v2.gif) | ![Junction policy](media/rl_traverse_curve_junction_seed00.gif) |
-
-## Key Results (archived)
-
-These describe the complete rule/controller/policy system, **not PPO alone**; episode-seed repetition is not equivalent to independent scenes or training seeds.
-
-| Task | Recorded result | Evidence |
-| --- | --- | --- |
-| Curve navigation | **20/20 success**, mean distance 1.355 m, **0 falls** | [seed01 report](reports/traverse_curve_high_level/seed01/report.md) |
-| 10 m-class multi-stage A→B | **20/20 success**, A-stop 100%, mean distance 10.73 m, 15.2 s, **0 falls** | [v2 report](reports/traverse_curve_multi_segment/seed00_v2/report.md), [protocol](docs/USAGE.md) |
-| Junction A/B routing | **40/40 success**, correct branch 100%, mean time 7.0 s, **0 falls** | [junction report](reports/traverse_curve_junction/seed00/report.md) |
-| Quality check (2026-09-12) | **196 passed / 1 skipped** (197 discovered); Pyright 0 errors | [scope and environment](docs/PORTFOLIO_VALIDATION.md) |
-
-Final PPO weights and full training logs are **not included** in this snapshot; reproduction requires retraining. See [Final Results](#final-results) and [Limitations](#limitations) for the evidence boundaries.
-
-## Why this design (Problem)
-
-Directly learning six low-level actions from a 61-dimensional observation produced stationary or short-range policies in the recorded curve experiments. The research question is whether explicit task state and a smaller navigation action space can support the repository's longer, staged tasks.
-
-## Architecture
-
-![System 2 rule-based branch selection feeds System 1 high-level PPO, which commands the System 0 scripted controller that drives the MuJoCo Go2W](docs/images/hierarchy.svg)
-
-- [`Go2wEnv`](rl/go2w_env.py): simulation, rewards, progress, docking and termination.
-- [`HighLevelEnvWrapper`](rl/high_level_env_wrapper.py): goal/progress observations, two-dimensional policy interface and rule-based branch locking.
-- [`LowLevelController`](rl/low_level_controller.py): known-path tracking and scripted braking; junction steering uses the teacher branch geometry and currently **ignores `turn_adjust`**.
-
-MoRA-inspired denotes an independent mapping of a layered idea, **not an official reproduction**. System 2 is a rule module; no VLM/VLA or learned semantic planner is implemented. Layer responsibilities and observation/action contracts are detailed in [ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Algorithms
-
-| Method | Implemented role | Entry point |
-| --- | --- | --- |
-| PPO | Low-level baselines and high-level navigation learning | [baseline](rl/train.py), [high-level curve](scripts/train_high_level_curve.py) |
-| BC | Scripted-teacher supervision; multi-stage/junction policy warm-start | [curve baseline](scripts/bc_pretrain.py), [multi-stage](scripts/bc_pretrain_multi_segment.py), [junction](scripts/bc_pretrain_junction.py) |
-| DAgger | Iterative teacher corrections for the low-level curve policy; recorded as unsuccessful | [training](scripts/dagger_train.py) |
-| Curriculum | Staged training, BC initialization and complete-task evaluation | [multi-stage](scripts/train_multi_segment_curriculum.py), [junction](scripts/train_junction_curriculum.py) |
-
-## Experimental Findings
-
-| Failure → diagnosis | Iteration / observation | Interpretation boundary |
-| --- | --- | --- |
-| Low-level PPO stagnates or travels ≤0.7 m | Separate scripted tracking from two-dimensional PPO commands | Architecture, state and exploration change together; no isolated causal proof |
-| High-level seed00 parks at speed lower bound 0.5 | Raise normal-navigation lower bound to 0.9; seed01 succeeds | Needs matched multi-seed controls |
-| First multi-stage run overshoots B; complete success 0% | Strengthen docking reward, penalize overshoot, terminate at B and add stage-specific BC; v2 succeeds | Contributions are bundled, not individually attributed |
-| Junction curriculum starts stage2 at an artificial stationary/yaw-zero state; 0% | Complete-start stage3 succeeds | State-distribution mismatch is a hypothesis requiring a matched-start control |
-
-Curriculum progression figures: [multi-stage curriculum](docs/images/multi_segment_curriculum.png) · [junction curriculum](docs/images/junction_curriculum.png). See [negative results and evidence caveats](docs/EXPERIMENTS.md), including discrepancies in the historical B+ HER narrative.
-
-## Ablation Studies
-
-- **BC vs random initialization:** both reach 0% success after 0.5 M steps. Training seeds and learning rates differ; this is an exploratory comparison, not a controlled estimate of BC's independent benefit. [Report](data/demo_trajectories/bc_ablation_report.md) · [curve ablation figure](docs/images/curve_high_level_ablation.png).
-- **DAgger:** five correction rounds; best recorded distance 0.915 m, still 0% success. Correction quality and near-fall labels remain concerns. [Report](data/demo_trajectories/dagger_training_report.md).
-- **Goal conditioning:** B+ random-goal evaluation records 90% and two falls; no-goal comparison records 100% under different goal conditions. This does not establish that goals are unnecessary in harder tasks. [B+](reports/traverse_curve_high_level_bplus/seed00/report.md), [no-goal](reports/traverse_curve_high_level_bplus_no_goal/seed00/report.md).
-
-## Final Results
-
-The Key Results table summarizes the archived successful runs. Episode-seed repetition is not equivalent to independent scenes or independent training seeds. Multi-stage/junction domain randomization is disabled, evaluation seeds overlap with stage evaluation, and distances use each report's metric definition. No real-robot or open-world claim is made.
-
-## Reproduction
-
-### Quick Start
-
-Use Python 3.10 or 3.12 on **Linux / WSL2's Linux filesystem**. Third-party model files include case-colliding filenames; common macOS/Windows filesystems cannot faithfully check out both.
-
-```bash
-git clone https://github.com/Anhao1314/go2w-MoRA-navigation.git
-cd go2w-MoRA-navigation
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-dev.txt
-python - <<'PYTHON'
-from rl.go2w_env import Go2wEnv
-env = Go2wEnv(task="traverse_curve", domain_randomize=False)
-obs, _ = env.reset(seed=0)
-print(obs.shape, env.action_space.shape)  # (61,), (6,)
-env.close()
-PYTHON
-```
-
-### Training and evaluation
-
-The command below uses the current training entry point. The archived seed01 report describes 61-dimensional observations; current goal-conditioning defaults may add fields. Compare code/configuration with the report before attempting a matched historical experiment; do not treat the current command as a byte-for-byte replay.
-
-```bash
-python scripts/train_high_level_curve.py \
-  --total-steps 2000000 --envs 4 --seed 1 \
-  --learning-rate 3e-4 --ent-coef 0.01 \
-  --run-dir rl/runs/traverse_curve_high_level/seed01
-```
-
-After training has created the matching model and normalization files:
-
-```bash
-python scripts/train_high_level_curve.py \
-  --report-only --run-dir rl/runs/traverse_curve_high_level/seed01
-```
-
-For updated curriculum output locations and recording, [the integrity guide](docs/INTEGRITY_UPGRADE.md) takes precedence over historical paths. For multi-stage/junction teacher generation, BC warm-start, staged training, smoke runs and video recording, follow the [full guide](docs/USAGE.md). Teacher generation and reporting may overwrite same-named samples/reports: use an isolated clone or back up historical artifacts. Dependencies partly use version ranges; save the exact environment and run configuration for each experiment. Historical results are reference observations, not retraining guarantees.
-
-## Project Structure
-
-| Path | Purpose |
-| --- | --- |
-| `rl/` | Environments, controllers, training, evaluation and local tools |
-| `scripts/` | Teacher data, BC, DAgger, curricula and recording |
-| `reports/` | Selected archived evaluations |
-| `data/demo_trajectories/` | Selected teacher data, BC models, normalization and research reports |
-| `tests/` | Environment, controller and tooling checks |
-| `media/`, `models/go2w/` | Recorded demos and third-party simulation assets |
-| `docs/` | Architecture, experiments, usage and attribution |
-
-## Tests & Quality
+各次运行生成独立目录，包含 `run_config.json`、`episodes.json` 和 `summary.json`。配置记录源版本、安装版本、输入哈希和评估种子；`complete` 仅表示评估过程完成，不代表任务成功。PPO 回放必须有相匹配、可信的 PPO 权重与 `VecNormalize` 文件，不能用 BC 权重冒充。
 
 ```bash
 python -m unittest discover -s tests -p 'test_*.py'
 pyright rl scripts mujoco_demos
 ```
 
-[CI](.github/workflows/ci.yml) installs dependencies, runs the suite and checks these source directories on Linux. The workflow definition is not a claim that CI has passed; inspect the actual Actions run. For headless rendering, CI uses EGL and installs Mesa. Current counts belong to the actual run, not a permanent badge.
+[2026-09-12 的封存验证记录](docs/PORTFOLIO_VALIDATION.md)为 **196 passed / 1 skipped、Pyright 0 errors**，属于特定环境和提交的历史结果，**不是本次 README 修改重新执行 CI 的声明**。[2026-10-06 的 `navigation-integrity-v1`](docs/INTEGRITY_UPGRADE.md)修复了种子初始化、课程阶段重复归一化、按回合计数和历史报告覆盖风险，**没有重新训练或追认历史 PPO 成功率**。
 
-## Limitations
+旧训练脚本可能覆盖同名演示和报告；需要重新训练时，应使用独立工作区。更多入口、配置、存储位置和兼容限制见[复现指南](docs/USAGE.md)。
 
-Known path geometry and simulation pose are required. Branch decisions and parts of docking are scripted. Successful PPO weights are absent; BC artifacts are not substitutes. Scene diversity, independent held-out tests, multi-training-seed variability, real sensors and sim-to-real remain unverified.
+## 7. 结论与后续工作
 
-## Roadmap
+仓库提供的是一套有明确边界、可供审查的分层导航工程研究：从单层 PPO 训练失败出发，重新分配控制责任，再对指定任务进行分阶段验证，并保留失败与不一致的原始证据。其价值是**系统设计、控制与学习接口探索、实验诊断及可复核记录**，并非证明一种新 RL 算法普遍优于现有方法。
 
-- Publish final PPO checkpoints with normalization, configuration and artifact hashes.
-- Add matched controller-only baselines and independent held-out scene/seed evaluation.
-- Test curriculum start-state matching and isolate docking/BC contributions.
-- Evaluate perception and real-robot interfaces before making deployment claims.
+下一步需要：统一协议的脚本控制器与 PPO 多训练种子对照、独立场景和域随机化测试、BC/停靠机制的单因素消融、公开匹配的 checkpoint/归一化统计，以及在充分处理感知、时延与安全边界之后开展实机研究。
 
-## Contributors
+## 参考文献
 
-- **Anhao1314** — project owner; original system, experiments, robotics/RL implementation and archived evidence.
-- **ChatGPT (OpenAI)** — AI collaborator on repository audit, the [experiment-integrity refactor](https://github.com/Anhao1314/go2w-MoRA-navigation/pull/1), reproducible evaluation/test design and documentation. This credit does not imply a separate GitHub identity or independent authorship.
+[1] Schulman, J., et al. (2017). *Proximal Policy Optimization Algorithms*. [arXiv:1707.06347](https://arxiv.org/abs/1707.06347).
 
-## License
+[2] Ross, S., Gordon, G., & Bagnell, J. A. (2011). *A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning*. AISTATS / PMLR 15, 627–635. [论文](https://proceedings.mlr.press/v15/ross11a.html).
 
-Original code: [MIT](LICENSE). Go2W model: [model license](models/go2w/LICENSE). See [third-party notices](docs/THIRD_PARTY_NOTICES.md).
+[3] Todorov, E., Erez, T., & Tassa, Y. (2012). *MuJoCo: A physics engine for model-based control*. IROS. [DOI](https://doi.org/10.1109/IROS.2012.6386109).
+
+[4] Raffin, A., et al. (2021). *Stable-Baselines3: Reliable Reinforcement Learning Implementations*. JMLR 22(268). [论文](https://www.jmlr.org/papers/v22/20-1364.html).
+
+**本研究的一手材料：** [架构契约](docs/ARCHITECTURE.md) · [实验与负结果](docs/EXPERIMENTS.md) · [复现协议](docs/USAGE.md) · [实验完整性与遗留问题](docs/INTEGRITY_UPGRADE.md)
+
+## 贡献与许可
+
+**Anhao1314：** 项目负责人，原始系统、机器人/RL 实现、实验与归档证据。**ChatGPT（OpenAI）：** AI 协作参与仓库审查、[实验完整性重构](https://github.com/Anhao1314/Go2w-MoRA-navigation/pull/1)、验证设计与文档维护；该署名不代表独立人类作者或同行评议。自研代码使用 [MIT](LICENSE)，Go2W 资产与第三方内容见[模型许可](models/go2w/LICENSE)及[第三方声明](docs/THIRD_PARTY_NOTICES.md)。
