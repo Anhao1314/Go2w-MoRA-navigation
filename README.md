@@ -211,9 +211,9 @@ pyright rl scripts mujoco_demos
 
 下一步按系统层推进：
 
-1. 在 Go2W 之外实现 Task Adapter API，抽象 `reset / step / goal / progress / success`；
-2. 为 S1 加入短期/情节记忆与 progress head，做记忆/进度消融；
-3. 把训练事件流接入 RL-Sentinel，量化跨任务、跨 seed 的早停可靠性；
+1. 在 Go2W 之外实现第二个 Task Adapter，验证 `reset / step / goal / progress / success` 的跨任务性；
+2. 把当前显式记忆与启发式 progress 升级为学习型模块，做记忆/进度消融；
+3. 将事件流从 multi-segment 扩到 junction/high-level-curve，并用 RL-Sentinel 做跨任务、跨 seed 的早停可靠性分析；
 4. 补多 seed、域随机化、单因素消融和匹配的 checkpoint/归一化；
 5. 完成 ROS2 P1 垂直切片，再讨论实机边界。
 
@@ -255,6 +255,32 @@ cmake --build build/core
 
 **边界：** 仿真-only；无 ROS2 节点、EKF、完整 WBC/RNEA、视觉/触觉、实机或 sim-to-real；MPC 尚未闭环接入 `Go2wEnv`；历史报告成功率不被追认。详见 [C++ 架构](docs/CPP_ROS2_ARCHITECTURE.md) · [控制设计](docs/CONTROL_DESIGN.md) · [标定](docs/CALIBRATION.md) · [验证](docs/VALIDATION.md) · [P0 协议](docs/CPP_STACK_PROTOCOL.md) · [cpp/README](cpp/README.md)。
 
+## 9. MoRA-Train 系统层（v0.1）
+
+[`mora/`](mora/) 已提供第一版系统层：
+
+- `TaskAdapter` 合同与 Go2W adapter（multi-segment / junction / high-level-curve）
+- `AgentRuntime`：S2 `RulePlanner` → S1 `Policy` → 短期/情节/任务记忆 → progress 闭环
+- v0.2 风格事件 writer 与 SB3 observer
+- multi-segment 训练默认写 `<run-root>/events.jsonl`，最终验收追加 `pass/fail/unknown` label
+- RL-Sentinel 已接受 `progress`、`success_rate`、`segment` 扩展字段
+
+最小运行示例：
+
+```python
+from mora.adapters.go2w import Go2wTaskAdapter
+from mora.policy import ZeroPolicy
+from mora.runtime import AgentRuntime
+
+task = Go2wTaskAdapter("multi-segment", scope=2)
+runtime = AgentRuntime(task, ZeroPolicy(action_dim=2), max_steps=50)
+result = runtime.run_episode(seed=0, max_steps=50)
+print(result)
+runtime.close()
+```
+
+**当前边界：** 记忆是显式数据结构，不是神经 Memory Token；progress 是启发式信号，不是校准失败概率；junction/high-level-curve 尚未接入事件 observer；ROS2 P1 尚未开始。接口与状态见 [MoRA-Train 系统层](docs/MORA_TRAIN.md)。
+
 ## 参考文献
 
 [1] Schulman, J., et al. (2017). *Proximal Policy Optimization Algorithms*. [arXiv:1707.06347](https://arxiv.org/abs/1707.06347).
@@ -269,4 +295,4 @@ cmake --build build/core
 
 ## 贡献与许可
 
-**Anhao1314：** 项目负责人，原始系统、机器人/RL 实现、实验与归档证据。**ChatGPT（OpenAI）：** AI 协作参与仓库审查、[实验完整性重构](https://github.com/Anhao1314/Go2w-MoRA-navigation/pull/1)、验证设计与文档维护；该署名不代表独立人类作者或同行评议。自研代码使用 [MIT](LICENSE)，Go2W 资产与第三方内容见[模型许可](models/go2w/LICENSE)及[第三方声明](docs/THIRD_PARTY_NOTICES.md)。
+**Anhao1314：** 项目负责人，原始系统、机器人/RL 实现、实验与归档证据。**Claude-Anhao（Claude）：** AI 协作参与 MoRA-Train 系统层、C++/Python 集成、Windows 训练编排、事件流与文档维护；该署名不代表独立人类作者或同行评议。**ChatGPT（OpenAI）：** AI 协作参与仓库审查、[实验完整性重构](https://github.com/Anhao1314/Go2w-MoRA-navigation/pull/1)、验证设计与文档维护；该署名不代表独立人类作者或同行评议。自研代码使用 [MIT](LICENSE)，Go2W 资产与第三方内容见[模型许可](models/go2w/LICENSE)及[第三方声明](docs/THIRD_PARTY_NOTICES.md)。

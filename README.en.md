@@ -212,9 +212,9 @@ This repository currently delivers the **first adapter** of MoRA-Train: an inspe
 
 Next work proceeds at the system level:
 
-1. implement a task-adapter API outside Go2W (`reset / step / goal / progress / success`);
-2. add short-term/episodic memory and a progress head to S1, with memory/progress ablations;
-3. connect the training event stream to RL-Sentinel for cross-task, multi-seed early-stop reliability;
+1. implement a second task adapter outside Go2W to test the `reset / step / goal / progress / success` contract across tasks;
+2. upgrade the explicit memory and heuristic progress modules to learned components, with memory/progress ablations;
+3. extend the event stream from multi-segment to junction/high-level-curve and use RL-Sentinel for cross-task, multi-seed early-stop reliability;
 4. add multi-seed, domain-randomization, single-factor ablations, and matched checkpoint/normalization manifests;
 5. complete the ROS2 P1 vertical slice before discussing real-robot boundaries.
 
@@ -241,6 +241,32 @@ The C++ and scripted pre-brake runs match item by item, and the seed-1000 trajec
 
 **Scope limits:** simulation only; no ROS2 nodes, EKF, full WBC/RNEA, vision/tactile, real robot, or sim-to-real; MPC is not yet closed-loop integrated with `Go2wEnv`; historical success rates are not retroactively claimed. See [C++ architecture](docs/CPP_ROS2_ARCHITECTURE.md) · [Control design](docs/CONTROL_DESIGN.md) · [Calibration](docs/CALIBRATION.md) · [Validation](docs/VALIDATION.md) · [P0 protocol](docs/CPP_STACK_PROTOCOL.md) · [cpp/README](cpp/README.md).
 
+## 9. MoRA-Train system layer (v0.1)
+
+[`mora/`](mora/) provides the first system layer:
+
+- the `TaskAdapter` contract and the Go2W adapter (multi-segment / junction / high-level-curve);
+- `AgentRuntime`: S2 `RulePlanner` → S1 `Policy` → short-term/episodic/task memory → progress loop;
+- a v0.2-style event writer and SB3 observer;
+- multi-segment training writes `<run-root>/events.jsonl` and appends a final `pass/fail/unknown` label;
+- RL-Sentinel accepts the `progress`, `success_rate`, and `segment` extension fields.
+
+Minimal example:
+
+```python
+from mora.adapters.go2w import Go2wTaskAdapter
+from mora.policy import ZeroPolicy
+from mora.runtime import AgentRuntime
+
+task = Go2wTaskAdapter("multi-segment", scope=2)
+runtime = AgentRuntime(task, ZeroPolicy(action_dim=2), max_steps=50)
+result = runtime.run_episode(seed=0, max_steps=50)
+print(result)
+runtime.close()
+```
+
+**Current boundaries:** memory is an explicit data structure, not a neural Memory Token; progress is a heuristic signal, not a calibrated failure probability; junction/high-level-curve do not emit events yet; ROS2 P1 has not started. See [MoRA-Train system layer](docs/MORA_TRAIN.md) for interfaces and status.
+
 ## References
 
 [1] Schulman, J., et al. (2017). *Proximal Policy Optimization Algorithms*. [arXiv:1707.06347](https://arxiv.org/abs/1707.06347).
@@ -255,4 +281,4 @@ The C++ and scripted pre-brake runs match item by item, and the seed-1000 trajec
 
 ## Contributions and licensing
 
-**Anhao1314:** Project owner; original robotics/RL system, experiments, and archived evidence. **ChatGPT (OpenAI):** AI collaboration on repository review, the [experiment-integrity refactor](https://github.com/Anhao1314/Go2w-MoRA-navigation/pull/1), validation design, and documentation; this credit does not imply an independent human author or peer review. Original code is [MIT licensed](LICENSE); Go2W assets and other third-party materials retain their own [model license](models/go2w/LICENSE) and [third-party notices](docs/THIRD_PARTY_NOTICES.md).
+**Anhao1314:** Project owner; original robotics/RL system, experiments, and archived evidence. **Claude-Anhao (Claude):** AI collaboration on the MoRA-Train system layer, C++/Python integration, Windows training orchestration, event streams, and documentation; this credit does not imply an independent human author or peer review. **ChatGPT (OpenAI):** AI collaboration on repository review, the [experiment-integrity refactor](https://github.com/Anhao1314/Go2w-MoRA-navigation/pull/1), validation design, and documentation; this credit does not imply an independent human author or peer review. Original code is [MIT licensed](LICENSE); Go2W assets and other third-party materials retain their own [model license](models/go2w/LICENSE) and [third-party notices](docs/THIRD_PARTY_NOTICES.md).
