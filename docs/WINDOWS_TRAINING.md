@@ -124,6 +124,26 @@ Lower-level `rl/train.py --task balance/full_chain` jobs are not part of this
 batch; use the `ppo` preset to queue them after the navigation batch is
 approved.
 
+## Data preservation
+
+Every run writes `run_config.json`, `events.jsonl`, stage eval logs,
+checkpoints, and TensorBoard logs. After the run finishes, fetch the complete
+run and build a hash manifest:
+
+```bash
+python tools/win_train.py fetch <job-id>
+```
+
+```bash
+python scripts/collect_run_evidence.py \
+  --run-dir rl/runs/_fetched/<job-id> \
+  --bundle-dir reports/evidence/<job-id>
+```
+
+The collector validates event timing and monotonic steps, hashes all artifacts,
+and writes `evidence_manifest.json` without rewriting the run. See
+[EXPERIMENT_DATA.md](EXPERIMENT_DATA.md) for the paper/report checklist.
+
 ## Limits
 
 - Code sync is a tar copy, not a git checkout; the Windows workspace has no

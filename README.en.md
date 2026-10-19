@@ -265,7 +265,7 @@ print(result)
 runtime.close()
 ```
 
-**Current boundaries:** memory is an explicit data structure, not a neural Memory Token; progress is a heuristic signal, not a calibrated failure probability; junction/high-level-curve do not emit events yet; ROS2 P1 has not started. See [MoRA-Train system layer](docs/MORA_TRAIN.md) for interfaces and status.
+**Current boundaries:** memory is an explicit data structure, not a neural Memory Token; progress is a heuristic signal, not a calibrated failure probability; junction/high-level-curve do not emit events yet; ROS2 P1 has not started. See [MoRA-Train system layer](docs/MORA_TRAIN.md) for interfaces and status, and [experiment data and paper evidence](docs/EXPERIMENT_DATA.md) for the run-artifact and manifest protocol.
 
 ## References
 
