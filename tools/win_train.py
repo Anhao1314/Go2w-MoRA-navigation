@@ -235,6 +235,9 @@ def submit(args: argparse.Namespace) -> None:
     job_id = args.name or f"{args.preset}-seed{args.seed}-{stamp}-{uuid.uuid4().hex[:6]}"
     run_root = run_root_for(args.preset, job_id)
     command, cwd, env = build_command(args, job_id, run_root)
+    source = git_revision()
+    env["GO2W_SOURCE_COMMIT"] = source["commit"]
+    env["GO2W_SOURCE_DIRTY"] = "true" if source["dirty"] else "false"
     job_dir = f"{JOBS_DIR}/{job_id}"
     log_path = f"{job_dir}/train.log"
     spec = {
@@ -247,7 +250,7 @@ def submit(args: argparse.Namespace) -> None:
         "task": args.preset,
         "seed": args.seed,
         "run_dir": run_root,
-        "source": git_revision(),
+        "source": source,
     }
 
     if args.dry_run:
@@ -316,9 +319,27 @@ def fetch_job(args: argparse.Namespace) -> None:
     meta = json.loads(ssh_run(
         f'"{WIN_PY}" "{RUNNER}" status --jobs-dir "{JOBS_DIR}" --job "{args.job}"'
     ))[0]
-    run_dir = meta.get("run_dir") or meta.get("cwd")
+    run_dir = args.run_dir or meta.get("run_dir")
     if not run_dir:
-        raise SystemExit("job metadata has no run_dir")
+        # Older job metadata predates run_dir; read the immutable job spec.
+        with tempfile.TemporaryDirectory() as tmp:
+            spec_local = pathlib.Path(tmp) / "spec.json"
+            spec_scp = _run(
+                ["scp", "-q", f"{HOST}:{JOBS_DIR}/{args.job}/spec.json",
+                 str(spec_local)],
+                capture=False,
+            )
+            if spec_scp.returncode == 0 and spec_local.is_file():
+                spec = json.loads(spec_local.read_text(encoding="utf-8"))
+                run_dir = spec.get("run_dir")
+    if not run_dir:
+        raise SystemExit("job metadata/spec has no run_dir")
+    run_dir = str(run_dir).replace("\\", "/").rstrip("/")
+    expected_prefix = f"{WIN_ROOT.rstrip('/')}/rl/runs/"
+    if not run_dir.startswith(expected_prefix):
+        raise SystemExit(
+            f"refusing to fetch a non-run directory: {run_dir}"
+        )
     dest = pathlib.Path(args.dest).expanduser().resolve() if args.dest else (
         REPO_ROOT / "rl" / "runs" / "_fetched" / args.job
     )
@@ -343,6 +364,8 @@ def fetch_job(args: argparse.Namespace) -> None:
     # Keep the job metadata and log with the fetched artifacts.
     job_dest = dest / "_job"
     job_dest.mkdir(exist_ok=True)
+    _run(["scp", "-q", f"{HOST}:{JOBS_DIR}/{args.job}/spec.json",
+          str(job_dest / "spec.json")], capture=False)
     _run(["scp", "-q", f"{HOST}:{JOBS_DIR}/{args.job}/meta.json",
           str(job_dest / "meta.json")], capture=False)
     _run(["scp", "-q", f"{HOST}:{JOBS_DIR}/{args.job}/train.log",
@@ -392,6 +415,8 @@ def main() -> None:
     p_fetch = sub.add_parser("fetch")
     p_fetch.add_argument("job")
     p_fetch.add_argument("--dest", default=None)
+    p_fetch.add_argument("--run-dir", default=None,
+                         help="Override the run directory; must be under rl/runs")
 
     args = parser.parse_args()
     if args.action == "sync":

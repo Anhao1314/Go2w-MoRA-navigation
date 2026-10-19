@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import os
 import pathlib
 import platform
 import subprocess
@@ -59,6 +60,14 @@ def runtime_metadata(root: pathlib.Path) -> dict[str, Any]:
         ).stdout.strip())
     except (OSError, subprocess.SubprocessError):
         pass
+    # The Windows training workspace is a source copy without .git.  The
+    # Mac-side submitter passes the source revision explicitly.
+    env_commit = os.environ.get("GO2W_SOURCE_COMMIT")
+    if env_commit and env_commit.strip():
+        revision = env_commit.strip()
+    env_dirty = os.environ.get("GO2W_SOURCE_DIRTY")
+    if env_dirty is not None:
+        dirty = env_dirty.strip().lower() in ("1", "true", "yes", "on")
     return {"python": platform.python_version(), "platform": platform.platform(),
             "packages": versions, "source_commit": revision, "source_dirty": dirty}
 

@@ -35,8 +35,9 @@ from typing import Any, Optional
 
 
 for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, "reconfigure"):
-        _stream.reconfigure(encoding="utf-8", errors="replace")
+    _reconfigure = getattr(_stream, "reconfigure", None)
+    if callable(_reconfigure):
+        _reconfigure(encoding="utf-8", errors="replace")
 
 
 def utc_now() -> str:
@@ -168,6 +169,7 @@ def launch(spec_path: pathlib.Path) -> dict[str, Any]:
         "log": spec["log"],
         "cwd": spec["cwd"],
         "command": spec["command"],
+        "run_dir": spec.get("run_dir"),
         "task": spec.get("task"),
         "seed": spec.get("seed"),
         "host": os.environ.get("COMPUTERNAME", ""),
@@ -195,6 +197,7 @@ def run(spec_path: pathlib.Path) -> int:
         "started_at": utc_now(),
         "cwd": spec["cwd"],
         "command": spec["command"],
+        "run_dir": spec.get("run_dir"),
         "log": str(log_path),
         "task": spec.get("task"),
         "seed": spec.get("seed"),

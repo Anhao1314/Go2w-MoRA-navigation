@@ -279,7 +279,7 @@ print(result)
 runtime.close()
 ```
 
-**当前边界：** 记忆是显式数据结构，不是神经 Memory Token；progress 是启发式信号，不是校准失败概率；junction/high-level-curve 尚未接入事件 observer；ROS2 P1 尚未开始。接口与状态见 [MoRA-Train 系统层](docs/MORA_TRAIN.md)。
+**当前边界：** 记忆是显式数据结构，不是神经 Memory Token；progress 是启发式信号，不是校准失败概率；junction/high-level-curve 尚未接入事件 observer；ROS2 P1 尚未开始。接口与状态见 [MoRA-Train 系统层](docs/MORA_TRAIN.md)；训练数据、checkpoint、事件流和论文证据清单见 [实验数据记录与论文证据](docs/EXPERIMENT_DATA.md)。
 
 ## 参考文献
 
