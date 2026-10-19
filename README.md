@@ -33,7 +33,7 @@ Go2W 是 MoRA-Train 的**第一个 task adapter 和实验床**，用来验证：
 | Memory | 短期/情节/任务记忆 | `mora/` 骨架已实现；神经 Memory Token 待做 |
 | Progress | 进度估计、停滞检测、重规划 | `mora/` 启发式已实现；学习型 progress head 待做 |
 | S0 | 运动控制、MPC、安全状态机 | P0 已交付并做数值验证 |
-| Observability | 事件流、as-of 早停分析 | `EventWriter` + SB3 callback 已实现；RL-Sentinel ingester 待接 |
+| Observability | 事件流、as-of 早停分析 | `EventWriter` + SB3 callback 已接入 multi-segment；RL-Sentinel ingester 待接 |
 
 系统层接口与当前能力见 [MoRA-Train 系统层](docs/MORA_TRAIN.md)。本仓库的结果只说明“第一个 adapter 在当前协议下可行”，**不等于 MoRA-Train 整体已被验证**，也不等于官方 MoRA 被复现。
 

@@ -17,9 +17,9 @@
 | 进度估计 | ✅ 启发式 | EMA delta + stall counter + replan signal |
 | 学习型 progress head | ⏳ 未实现 | 接口已留出，后续用辅助任务训练 |
 | 事件流 | ✅ 已实现 | v0.2 风格 `start / sample / finish / label`，强制 `event_time <= available_at` |
-| SB3 observer | ✅ 已实现 | `Sb3EventCallback` 周期性写 sample，训练结束写 finish |
+| SB3 observer | ✅ 已实现 | `Sb3EventCallback` 周期性写 sample；课程阶段用全局 step offset 保持单调 |
 | Go2W adapter | ✅ 已实现 | multi-segment / junction / high-level-curve |
-| 训练脚本接入 | ⏳ 下一步 | 目前通过 adapter/runtime 可运行，但尚未替换四个训练入口 |
+| 训练脚本接入 | 🟡 multi-segment 已接入 | `train_multi_segment_curriculum.py` 默认写 `<run-root>/events.jsonl`；junction/high-level-curve 待接 |
 | RL-Sentinel ingester | ⏳ 下一步 | Mac 侧尚未消费 Go2W 的事件扩展字段 |
 
 测试：`249 tests OK (1 skipped)`（2026-10-19，macOS），`mora` 通过 Pyright。
@@ -111,6 +111,10 @@ runtime.close()
 
 当前 sample 扩展字段包括 `progress`、`success_rate`、`segment`。RL-Sentinel 的 Go2W ingester 需要显式接受这些字段，而不是把它们当作旧 schema 的未知字段。
 
+`planned_steps` 是计划预算，不是硬上界。SB3/PPO 可能按 rollout 边界少量超跑；例如 smoke 计划 30k，实际记录到 35k。消费者必须使用实际 `sample.step`，不能因为超过计划预算就拒绝一条 run。
+
+**课程阶段的一个真实坑：** `PPO.load()` 会把 `num_timesteps` 重置到新模型的计数，导致 sample step 在阶段边界回退。`Sb3EventCallback` 在每次 `_on_training_start` 捕获阶段局部起点，并用全局 offset 计算 `global_step`；multi-segment smoke 已验证 sample step 严格递增。
+
 ## 6. 与 Go2W 训练的关系
 
 - 当前 Go2W 环境仍由 `HighLevelEnvWrapper` 提供观测和任务进度。
@@ -120,11 +124,27 @@ runtime.close()
 
 ## 7. 下一步
 
-1. 把 `Sb3EventCallback` 接入 `train_multi_segment_curriculum.py` 等入口，生成真实训练事件。
+1. 把 `Sb3EventCallback` 接到 junction、high-level-curve、curve 三个入口；multi-segment 已完成。
 2. 在 RL-Sentinel 增加 Go2W ingester，接受 `progress/success_rate/segment` 扩展字段。
 3. 用 `AgentRuntime` 跑一条完整 multi-segment episode，对比 scripted 路径的 success/progress。
 4. 加一个学习型 progress head 和一个记忆消融实验。
 5. 再考虑 ROS2/S0 500 Hz 节点。
+
+## 6.1 multi-segment 训练入口
+
+```bash
+python scripts/train_multi_segment_curriculum.py \
+  --seed 0 --device cpu \
+  --run-root rl/runs/multi_segment/<job-id>
+```
+
+默认在 run 根目录写 `events.jsonl`；可用 `--event-log PATH` 指定位置，或 `--no-event-log` 关闭。事件生命周期由脚本管理：
+
+- 脚本启动后写 `start`（task、seed、planned_steps）
+- 每个 stage 的 `Sb3EventCallback` 只写 `sample`，不重复 start/finish
+- 最终验收写 `finish`，然后按 `success_rate >= 0.6` 写 `label`（smoke 固定 `unknown`）
+
+2026-10-19 的 Windows smoke（`mseg-events-smoke3`）已验证：start + 7 个 sample + finish + label，sample step 严格递增。
 
 ## 8. 边界
 

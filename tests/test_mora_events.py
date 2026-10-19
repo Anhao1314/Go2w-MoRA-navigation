@@ -127,6 +127,102 @@ class Sb3CallbackTests(unittest.TestCase):
             self.assertEqual(sample["segment"], 1.0)
             self.assertEqual(events[2]["payload"]["status"], "completed")
 
+    def test_step_offset_keeps_global_steps_monotonic(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "events.jsonl"
+            writer = EventWriter(
+                path,
+                "run-offset",
+                task="fake",
+                seed=0,
+                planned_steps=20,
+            )
+            callback = Sb3EventCallback(
+                writer,
+                sample_interval=5,
+                manage_lifecycle=False,
+                step_offset=10,
+            )
+            writer.start()
+            callback.num_timesteps = 5
+            callback.locals = {"infos": [], "rewards": []}
+            self.assertTrue(callback._on_step())
+            callback.set_step_offset(20)
+            callback.num_timesteps = 5
+            self.assertTrue(callback._on_step())
+            writer.finish({"status": "completed"})
+            writer.close()
+            events = [
+                json.loads(line)
+                for line in path.read_text(encoding="utf-8").splitlines()[1:]
+            ]
+            samples = [e for e in events if e["kind"] == "sample"]
+            self.assertEqual([e["payload"]["step"] for e in samples], [15, 25])
+
+    def test_training_start_resets_stage_origin(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "events.jsonl"
+            writer = EventWriter(
+                path,
+                "run-stage",
+                task="fake",
+                seed=0,
+                planned_steps=20000,
+            )
+            callback = Sb3EventCallback(
+                writer,
+                sample_interval=5,
+                manage_lifecycle=False,
+                step_offset=10000,
+            )
+            writer.start()
+            callback.num_timesteps = 10000
+            callback._on_training_start()
+            callback.num_timesteps = 15000
+            callback.locals = {"infos": [], "rewards": []}
+            self.assertTrue(callback._on_step())
+            writer.finish({"status": "completed"})
+            writer.close()
+            events = [
+                json.loads(line)
+                for line in path.read_text(encoding="utf-8").splitlines()[1:]
+            ]
+            samples = [e for e in events if e["kind"] == "sample"]
+            self.assertEqual([e["payload"]["step"] for e in samples], [15000])
+
+    def test_callback_can_leave_lifecycle_to_caller(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "events.jsonl"
+            writer = EventWriter(
+                path,
+                "run-manual",
+                task="fake",
+                seed=0,
+                planned_steps=10,
+            )
+            callback = Sb3EventCallback(
+                writer, sample_interval=1, manage_lifecycle=False
+            )
+            writer.start()
+            callback.num_timesteps = 1
+            callback.locals = {
+                "infos": [{"progress": 0.2, "goal": False}],
+                "rewards": [0.5],
+            }
+            self.assertTrue(callback._on_step())
+            callback._on_training_end()
+            self.assertFalse(writer.finished)
+            writer.finish({"status": "completed"})
+            writer.close()
+            events = [
+                json.loads(line)
+                for line in path.read_text(encoding="utf-8").splitlines()[1:]
+            ]
+            self.assertEqual(
+                [event["kind"] for event in events],
+                ["start", "sample", "finish"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

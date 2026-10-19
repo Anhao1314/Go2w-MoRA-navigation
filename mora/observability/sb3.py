@@ -33,26 +33,62 @@ class Sb3EventCallback(BaseCallback):
         writer: EventWriter,
         *,
         sample_interval: int = 1000,
+        manage_lifecycle: bool = True,
+        step_offset: int = 0,
         verbose: int = 0,
     ) -> None:
         super().__init__(verbose=verbose)
         if sample_interval < 1:
             raise ValueError("sample_interval must be positive")
+        if step_offset < 0:
+            raise ValueError("step_offset must be non-negative")
         self.writer = writer
         self.sample_interval = int(sample_interval)
+        self.manage_lifecycle = bool(manage_lifecycle)
+        self.step_offset = int(step_offset)
+        self._stage_offset = int(step_offset)
+        self._stage_start_step: int | None = None
+
+    def set_step_offset(self, offset: int) -> None:
+        """Set the global step offset when a curriculum stage reloads a model."""
+        if offset < 0:
+            raise ValueError("step_offset must be non-negative")
+        self.step_offset = int(offset)
+        self._stage_start_step = None
+
+    @property
+    def global_step(self) -> int:
+        if self._stage_start_step is None:
+            return self.step_offset + int(self.num_timesteps)
+        return self._stage_offset + (
+            int(self.num_timesteps) - self._stage_start_step
+        )
 
     def _on_training_start(self) -> None:
-        if not self.writer.started:
+        # SB3 resets the callback's counter from the newly loaded model at the
+        # start of each curriculum stage.  Capture that local origin so the
+        # event stream stays monotonic across model reloads.
+        self._stage_offset = self.step_offset
+        self._stage_start_step = int(self.num_timesteps)
+        if self.manage_lifecycle and not self.writer.started:
             self.writer.start()
 
     def _on_step(self) -> bool:
-        if self.num_timesteps % self.sample_interval != 0:
+        step = self.global_step
+        if step % self.sample_interval != 0:
             return True
         infos = self.locals.get("infos", [])
         rewards = self.locals.get("rewards", [])
-        payload: dict[str, Any] = {"step": int(self.num_timesteps)}
+        payload: dict[str, Any] = {"step": step}
         if len(rewards) > 0:
             payload["reward"] = float(np.mean(rewards))
+        model = getattr(self, "model", None)
+        logger = getattr(model, "logger", None)
+        logger_values = getattr(logger, "name_to_value", {}) if logger else {}
+        if "train/approx_kl" in logger_values:
+            payload["approx_kl"] = float(logger_values["train/approx_kl"])
+        if "train/value_loss" in logger_values:
+            payload["value_loss"] = float(logger_values["train/value_loss"])
         if isinstance(infos, list) and infos:
             self._aggregate_infos(infos, payload)
         self.writer.sample(payload)
@@ -88,11 +124,13 @@ class Sb3EventCallback(BaseCallback):
                     continue
 
     def _on_training_end(self) -> None:
+        if not self.manage_lifecycle:
+            return
         if self.writer.started and not self.writer.finished:
             self.writer.finish(
                 {
                     "status": "completed",
-                    "final_step": int(self.num_timesteps),
+                    "final_step": self.global_step,
                 }
             )
         self.writer.close()
