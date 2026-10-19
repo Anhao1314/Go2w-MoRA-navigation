@@ -22,8 +22,10 @@ to it as ``train.log``.
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as _dt
 import json
+import math
 import os
 import pathlib
 import signal
@@ -31,6 +33,7 @@ import subprocess
 import sys
 import time
 import traceback
+from collections import Counter
 from typing import Any, Optional
 
 
@@ -289,6 +292,136 @@ def tail(jobs_dir: pathlib.Path, job: str, lines: int) -> str:
     return "".join(content[-max(1, lines):])
 
 
+def _human_duration(seconds: float | None) -> str | None:
+    if seconds is None or not math.isfinite(seconds) or seconds < 0:
+        return None
+    minutes, sec = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {minutes}m"
+    if minutes:
+        return f"{minutes}m {sec}s"
+    return f"{sec}s"
+
+
+def snapshot(jobs_dir: pathlib.Path, job: str) -> dict[str, Any]:
+    """Read-only live snapshot from a run directory; never writes run files."""
+    job_dir = jobs_dir / job
+    meta_path = job_dir / "meta.json"
+    if not meta_path.exists():
+        raise SystemExit(f"job not found: {job}")
+    meta = read_json(meta_path)
+    spec_path = job_dir / "spec.json"
+    spec = read_json(spec_path) if spec_path.exists() else {}
+    run_dir = spec.get("run_dir") or meta.get("run_dir")
+    if not run_dir:
+        raise SystemExit("job spec has no run_dir")
+    run = pathlib.Path(run_dir)
+    events: list[dict[str, Any]] = []
+    events_path = run / "events.jsonl"
+    if events_path.is_file():
+        lines = events_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        for line in lines[1:]:
+            try:
+                events.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    kinds = Counter(str(event.get("kind")) for event in events)
+    start = next((event for event in events if event.get("kind") == "start"), None)
+    finish = next((event for event in events if event.get("kind") == "finish"), None)
+    label_event = next((event for event in events if event.get("kind") == "label"), None)
+    planned_steps = (
+        int(start["payload"].get("planned_steps", 0)) if start else 0
+    )
+    samples = [
+        event for event in events
+        if event.get("kind") == "sample" and "step" in event.get("payload", {})
+    ]
+    samples.sort(key=lambda event: (int(event["payload"]["step"]), event.get("event_id", "")))
+    last_step = int(samples[-1]["payload"]["step"]) if samples else 0
+    event_progress = last_step / planned_steps if planned_steps else None
+    rate = None
+    if len(samples) >= 2:
+        recent = samples[-25:]
+        first, last = recent[0], recent[-1]
+        dt = float(last["event_time"]) - float(first["event_time"])
+        ds = int(last["payload"]["step"]) - int(first["payload"]["step"])
+        if dt > 0 and ds >= 0:
+            rate = ds / dt
+    eta_seconds = (
+        max(0.0, (planned_steps - last_step) / rate)
+        if rate and planned_steps else None
+    )
+    stage_dirs = sorted(
+        (path for path in run.glob("stage*") if path.is_dir()),
+        key=lambda path: path.name,
+    )
+    stages_completed = sum(
+        1 for path in stage_dirs if (path / ".completed").exists()
+    )
+    recent_evals: list[dict[str, Any]] = []
+    for stage_dir in stage_dirs:
+        eval_log = stage_dir / "eval_log.csv"
+        if not eval_log.is_file():
+            continue
+        with eval_log.open(newline="", encoding="utf-8", errors="replace") as handle:
+            rows = list(csv.DictReader(handle))
+        for row in rows[-5:]:
+            record: dict[str, Any] = {"stage": stage_dir.name}
+            for key, value in row.items():
+                try:
+                    record[key] = float(value) if value not in ("", None) else None
+                except (TypeError, ValueError):
+                    record[key] = value
+            recent_evals.append(record)
+    recent_evals.sort(key=lambda row: float(row.get("timesteps") or 0))
+    latest_eval = recent_evals[-1] if recent_evals else None
+    training_complete = bool(stage_dirs) and stages_completed >= len(stage_dirs)
+    current_stage = (
+        latest_eval.get("stage") if latest_eval
+        else stage_dirs[-1].name if stage_dirs else None
+    )
+    progress = 1.0 if training_complete else event_progress
+    status = str(meta.get("status", "unknown"))
+    if finish is not None:
+        status = "finished"
+    elif training_complete and status in ("running", "launched"):
+        status = "evaluating"
+    if training_complete:
+        eta_seconds = None
+        eta_human = "final acceptance" if finish is None else "complete"
+    else:
+        eta_human = _human_duration(eta_seconds)
+    return {
+        "job_id": job,
+        "status": status,
+        "task": spec.get("task") or meta.get("task"),
+        "seed": spec.get("seed", meta.get("seed")),
+        "run_dir": str(run),
+        "source": spec.get("source"),
+        "current_stage": current_stage,
+        "stages_completed": stages_completed,
+        "stage_count": len(stage_dirs),
+        "training_complete": training_complete,
+        "planned_steps": planned_steps,
+        "current_step": last_step,
+        "event_progress": event_progress,
+        "progress": progress,
+        "sample_count": len(samples),
+        "event_count": len(events),
+        "kind_counts": dict(kinds),
+        "throughput_steps_s": rate,
+        "eta_seconds": eta_seconds,
+        "eta_human": eta_human,
+        "latest_eval": latest_eval,
+        "recent_evals": recent_evals[-10:],
+        "last_event": events[-1] if events else None,
+        "finish_status": finish["payload"].get("status") if finish else None,
+        "label": label_event["payload"] if label_event else None,
+        "updated_at": utc_now(),
+    }
+
+
 def stop(jobs_dir: pathlib.Path, job: str) -> dict[str, Any]:
     meta_path = jobs_dir / job / "meta.json"
     if not meta_path.exists():
@@ -339,6 +472,10 @@ def main() -> int:
     p_stop.add_argument("--jobs-dir", default=str(pathlib.Path(__file__).resolve().parent.parent / "rl" / "runs" / "_jobs"))
     p_stop.add_argument("--job", required=True)
 
+    p_snap = sub.add_parser("snapshot")
+    p_snap.add_argument("--jobs-dir", default=str(pathlib.Path(__file__).resolve().parent.parent / "rl" / "runs" / "_jobs"))
+    p_snap.add_argument("--job", required=True)
+
     args = parser.parse_args()
     if args.action == "launch":
         print(json.dumps(launch(pathlib.Path(args.spec)), ensure_ascii=False))
@@ -351,6 +488,9 @@ def main() -> int:
         print(tail(pathlib.Path(args.jobs_dir), args.job, args.lines), end="")
     elif args.action == "stop":
         print(json.dumps(stop(pathlib.Path(args.jobs_dir), args.job),
+                         ensure_ascii=False, indent=2))
+    elif args.action == "snapshot":
+        print(json.dumps(snapshot(pathlib.Path(args.jobs_dir), args.job),
                          ensure_ascii=False, indent=2))
     return 0
 
