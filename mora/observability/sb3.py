@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
@@ -80,19 +81,43 @@ class Sb3EventCallback(BaseCallback):
         infos = self.locals.get("infos", [])
         rewards = self.locals.get("rewards", [])
         payload: dict[str, Any] = {"step": step}
-        if len(rewards) > 0:
-            payload["reward"] = float(np.mean(rewards))
+        reward = self._finite_mean(rewards)
+        if reward is not None:
+            payload["reward"] = reward
         model = getattr(self, "model", None)
         logger = getattr(model, "logger", None)
         logger_values = getattr(logger, "name_to_value", {}) if logger else {}
-        if "train/approx_kl" in logger_values:
-            payload["approx_kl"] = float(logger_values["train/approx_kl"])
-        if "train/value_loss" in logger_values:
-            payload["value_loss"] = float(logger_values["train/value_loss"])
+        for key, name in (
+            ("approx_kl", "train/approx_kl"),
+            ("value_loss", "train/value_loss"),
+        ):
+            value = logger_values.get(name)
+            if value is None:
+                continue
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(number):
+                payload[key] = number
         if isinstance(infos, list) and infos:
             self._aggregate_infos(infos, payload)
         self.writer.sample(payload)
         return True
+
+    @staticmethod
+    def _finite_mean(values: list[Any]) -> float | None:
+        clean: list[float] = []
+        for value in values:
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(number):
+                clean.append(number)
+        if not clean:
+            return None
+        return float(np.mean(clean))
 
     @staticmethod
     def _aggregate_infos(
@@ -118,19 +143,13 @@ class Sb3EventCallback(BaseCallback):
             if key == "success_rate":
                 payload[key] = float(np.mean([bool(value) for value in values]))
             else:
-                try:
-                    payload[key] = float(np.mean([float(value) for value in values]))
-                except (TypeError, ValueError):
-                    continue
+                mean = Sb3EventCallback._finite_mean(values)
+                if mean is not None:
+                    payload[key] = mean
 
     def _on_training_end(self) -> None:
         if not self.manage_lifecycle:
             return
         if self.writer.started and not self.writer.finished:
-            self.writer.finish(
-                {
-                    "status": "completed",
-                    "final_step": self.global_step,
-                }
-            )
+            self.writer.finish({"status": "completed"})
         self.writer.close()

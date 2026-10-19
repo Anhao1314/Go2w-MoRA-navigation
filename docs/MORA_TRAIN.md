@@ -107,6 +107,8 @@ runtime.close()
 - `event_time <= available_at`
 - `start` 只能一次；`sample` 必须在 active run 中；`finish` 只能一次；`label` 必须在 `finish` 之后
 - NaN/Infinity 拒绝；文件独占创建，避免覆盖其他 run 的证据
+- `start.seed` 按 v0.2 合同写成字符串
+- observer 会跳过非有限遥测值，避免 NaN 中断训练；`EventWriter` 本身仍拒绝 NaN
 - `Sb3EventCallback` 只写 `start/sample/finish`；最终 `pass/fail` 由验收评估追加
 
 当前 sample 扩展字段包括 `progress`、`success_rate`、`segment`。RL-Sentinel 的 Go2W ingester 需要显式接受这些字段，而不是把它们当作旧 schema 的未知字段。
