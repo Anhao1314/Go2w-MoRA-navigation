@@ -143,6 +143,24 @@ class MultiSegmentLowLevelController(LowLevelController):
         return np.clip(action, -1.0, 1.0)
 
 
+class ZeroLowLevelController(LowLevelController):
+    """S0 ablation: ignore the high-level command and emit zero commands.
+
+    This is a controlled negative cohort, not a navigation policy.  It keeps
+    the high-level observation/action interface intact so the event stream and
+    evaluation protocol remain comparable with the scripted S0 runs.
+    """
+
+    def compute_action(
+        self,
+        x: float,
+        y: float,
+        yaw: float,
+        high_level_cmd: dict | None = None,
+    ) -> np.ndarray:
+        return np.zeros(6, dtype=np.float32)
+
+
 def default_controller() -> LowLevelController:
     p = default_params()
     return LowLevelController(
