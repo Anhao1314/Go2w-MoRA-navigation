@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
+build/
+deps/
 .venv/
 .conda/
 .pytest_cache/

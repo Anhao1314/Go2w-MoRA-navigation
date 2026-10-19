@@ -10,6 +10,7 @@ import copy
 import csv
 import json
 import math
+import os
 import pathlib
 import pickle
 import sys
@@ -58,9 +59,11 @@ EVAL_EPISODES = 5
 class MsegWrapper(HighLevelEnvWrapper):
     """在 reset 时注入 scope / start_at_subgoal。"""
 
-    def __init__(self, base: Go2wEnv, scope: int, start_a: bool):
+    def __init__(self, base: Go2wEnv, scope: int, start_a: bool,
+                 controller: Any | None = None):
         super().__init__(
             base,
+            controller=controller,
             append_mora=True,
             use_goal_condition=False,
             goal_min=1.4,
@@ -77,7 +80,8 @@ class MsegWrapper(HighLevelEnvWrapper):
         return super().reset(seed=seed, options=opts)
 
 
-def make_stage_env(scope: int, start_a: bool) -> MsegWrapper:
+def make_stage_env(scope: int, start_a: bool, s0: str = "scripted",
+                   pre_brake: bool = False) -> MsegWrapper:
     base = Go2wEnv(
         task="traverse_curve",
         domain_randomize=False,
@@ -85,7 +89,19 @@ def make_stage_env(scope: int, start_a: bool) -> MsegWrapper:
         reward_version="mseg",
         scope=scope,
     )
-    return MsegWrapper(base, scope=scope, start_a=start_a)
+    controller: Any | None = None
+    if s0 == "cpp":
+        from rl.cpp_s0_controller import CppS0Controller
+        controller = CppS0Controller(base, pre_brake=pre_brake)
+    elif s0 == "scripted":
+        if pre_brake:
+            from rl.low_level_controller import MultiSegmentLowLevelController
+            controller = MultiSegmentLowLevelController(
+                base.segments, pre_brake=True
+            )
+    else:
+        raise ValueError(f"unknown S0 backend: {s0}")
+    return MsegWrapper(base, scope=scope, start_a=start_a, controller=controller)
 
 
 class MsegEvalCallback(BaseCallback):
@@ -224,7 +240,8 @@ def load_norm_dict(path: pathlib.Path) -> dict:
 
 
 def final_acceptance(
-    model: Any, vec: Any, episodes: int = 20, seed_start: int = 1000
+    model: Any, vec: Any, episodes: int = 20, seed_start: int = 1000,
+    s0: str = "scripted", pre_brake: bool = False,
 ) -> dict:
     succ = 0
     passed = 0
@@ -234,7 +251,7 @@ def final_acceptance(
     failed_terminations = 0
     records: list[dict] = []
     for ep, eval_seed in enumerate(acceptance_seeds(episodes, seed_start)):
-        env = make_stage_env(scope=2, start_a=False)
+        env = make_stage_env(scope=2, start_a=False, s0=s0, pre_brake=pre_brake)
         try:
             obs, info = env.reset(seed=eval_seed)
             steps = 0
@@ -307,6 +324,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="多段路径三阶段课程学习")
     parser.add_argument("--envs", type=int, default=4)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--device",
+        choices=("auto", "cpu", "cuda", "mps"),
+        default=os.environ.get("GO2W_TRAIN_DEVICE", "cpu"),
+        help="Torch device for PPO; GO2W_TRAIN_DEVICE overrides the default",
+    )
     parser.add_argument("--run-root", type=str, default=None,
                         help="New output directory; existing directories are rejected")
     parser.add_argument("--record", action="store_true", help="Record a run-local demo")
@@ -375,7 +398,7 @@ def main() -> None:
             obs_rms.mean = np.asarray(nd["mean"], dtype=np.float32)
             obs_rms.var = np.asarray(nd["var"], dtype=np.float32)
             obs_rms.count = float(nd.get("count", 1e4))
-            model = PPO.load(args.bc_model, env=train_env, device="cpu",
+            model = PPO.load(args.bc_model, env=train_env, device=args.device,
                              learning_rate=lr, seed=args.seed)
         elif stage["name"] == "stage2":
             nd = load_norm_dict(pathlib.Path(args.stage2_bc_norm))
@@ -383,12 +406,13 @@ def main() -> None:
             obs_rms.mean = np.asarray(nd["mean"], dtype=np.float32)
             obs_rms.var = np.asarray(nd["var"], dtype=np.float32)
             obs_rms.count = float(nd.get("count", 1e4))
-            model = PPO.load(args.stage2_bc_model, env=train_env, device="cpu",
+            model = PPO.load(args.stage2_bc_model, env=train_env, device=args.device,
                              learning_rate=lr, seed=args.seed)
         else:
             assert prev_best is not None and prev_norm is not None
-            model = PPO.load(str(prev_best), env=train_env, device="cpu",
+            model = PPO.load(str(prev_best), env=train_env, device=args.device,
                              learning_rate=lr, seed=args.seed)
+        print(f"PPO device: {model.device}")
         model.ent_coef = 0.005
         model.tensorboard_log = str(stage_dir / "tensorboard")
         cb = MsegEvalCallback(
@@ -427,7 +451,7 @@ def main() -> None:
     report_dir.mkdir(parents=True, exist_ok=False)
     dummy = make_stage_env(scope=2, start_a=False)
     vec = normalize_once(DummyVecEnv([lambda: dummy]), checkpoint=prev_norm, training=False)
-    model = PPO.load(str(prev_best), device="cpu")
+    model = PPO.load(str(prev_best), device=args.device)
     acc = final_acceptance(model, vec, episodes=eval_episodes)
     write_json_new(report_dir / "episodes.json", acc["episode_records"])
     print("最终验收:", acc)

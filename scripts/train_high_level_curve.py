@@ -14,6 +14,7 @@ import argparse
 import copy
 import csv
 import json
+import os
 import pathlib
 import sys
 import time
@@ -696,6 +697,12 @@ def main() -> None:
     parser.add_argument("--total-steps", type=int, default=2_000_000)
     parser.add_argument("--envs", type=int, default=4)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--device",
+        choices=("auto", "cpu", "cuda", "mps"),
+        default=os.environ.get("GO2W_TRAIN_DEVICE", "cpu"),
+        help="Torch device for PPO; GO2W_TRAIN_DEVICE overrides the default",
+    )
     parser.add_argument("--run-dir", type=str, default=str(DEFAULT_RUN_DIR))
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--ent-coef", type=float, default=0.01)
@@ -778,9 +785,11 @@ def main() -> None:
         clip_range=0.2,
         policy_kwargs={"net_arch": [256, 256]},
         seed=args.seed,
+        device=args.device,
         verbose=1,
         tensorboard_log=str(run_dir / "tensorboard"),
     )
+    print(f"PPO device: {model.device}")
     callback = HighLevelEvalCallback(
         eval_freq_timesteps=eval_freq,
         n_eval_episodes=args.eval_episodes,

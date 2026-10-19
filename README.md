@@ -1,20 +1,51 @@
-# 已知路径条件下的 Unitree Go2W 分层强化学习导航：方法、实验与有效性分析
+# MoRA-Train：面向具身智能体的分层训练系统
 
-*Hierarchical Reinforcement Learning Navigation for Unitree Go2W: Methods, Experiments, and Validity Analysis*
+### 第一个 adapter：Unitree Go2W 轮式四足长程导航
 
-**文档性质：** 基于仓库代码及归档实验的工程研究报告（非同行评议论文）  
-**研究对象：** Unitree Go2W · MuJoCo · PPO / BC / DAgger  
-**适用范围：** 已知路径下的指定仿真任务，非真实机器人部署验证
+*MoRA-Train: A Hierarchical Training System for Embodied Agents · First adapter: Unitree Go2W*
+
+- **文档性质：** 系统工程与研究记录（非同行评议论文）
+- **项目主体：** MoRA-Train（MoRA-inspired 分层具身训练系统）
+- **本仓库角色：** 第一个 Task Adapter / 实验床 + S0 C++ 控制核心
+- **训练侧：** Windows（Go2W 全部训练与评估）
+- **量化侧：** RL-Sentinel（Mac，时间正确的训练可靠性分析）
+- **适用范围：** 仿真-only；非真实机器人部署；不声称复现官方 MoRA
 
 [English](README.en.md) · [架构与接口](docs/ARCHITECTURE.md) · [实验报告索引](docs/EXPERIMENTS.md) · [复现指南](docs/USAGE.md) · [完整性升级说明](docs/INTEGRITY_UPGRADE.md)
 
+## 0. 项目定位
+
+MoRA-Train 要解决的不是“让一只机器狗走完一条路”，而是：
+
+> 如何训练一个由 S2 规划、S1 目标条件执行（多粒度记忆 + 进度闭环）、S0 可验证控制组成的具身智能体，并在多个任务上训练、评估和量化，而不是只针对单一平台调参。
+
+Go2W 是 MoRA-Train 的**第一个 task adapter 和实验床**，用来验证：
+
+- 层次接口是否可组合：S2 规则决策 → S1 学习策略 → S0 C++ 控制；
+- S0 是否数值可信：FK/IK/Jacobian、质心动力学、MPC 与 MuJoCo 一致；
+- S1 是否能完成多段、岔路、目标点等长程任务；
+- 训练过程是否能被 RL-Sentinel 以时间正确的方式量化。
+
+| 层 | 职责 | 本仓库现状 |
+| --- | --- | --- |
+| S2 | 任务分解、分支/技能选择 | Go2W adapter 内用规则实现 |
+| S1 | 目标条件策略 | PPO / BC / DAgger / 课程学习 |
+| Memory | 短期/情节/任务记忆 | 规划中；当前利用观测历史与阶段信息 |
+| Progress | 进度估计、停滞检测、重规划 | 规划中；当前使用任务进度指标 |
+| S0 | 运动控制、MPC、安全状态机 | P0 已交付并做数值验证 |
+| Observability | 事件流、as-of 早停分析 | RL-Sentinel（独立仓库） |
+
+因此，本仓库的结果只说明“第一个 adapter 在当前协议下可行”，**不等于 MoRA-Train 整体已被验证**，也不等于官方 MoRA 被复现。
+
 ## 摘要
 
-**背景：** 在本项目归档的弯道任务中，使用 61 维观测直接学习 6 维底层动作的 PPO 策略，出现原地停滞、移动距离短或任务失败等问题。**目的：** 探索已知路径条件下，通过分层控制降低策略学习难度、支持更长程和多阶段导航任务的可行性。**方法：** 将规则目标决策（System 2）、学习型高层导航指令（System 1）以及脚本路径跟踪和 PD 执行（System 0）组合，并记录 PPO、行为克隆（BC）、DAgger、课程学习和探索性对照实验。**结果：** 在各自的历史固定仿真协议下，完整系统的弯道、多段 A→B 和岔路任务分别记录 **20/20、20/20、40/40** 成功；同时保留单层 PPO、部分 BC/DAgger 实验和多段初版的失败记录。**结论：** 现有证据支持分层**完整系统**在指定任务中的可行性，但尚不能单独归因 PPO、BC 或某个改动的收益，也不足以证明未知场景泛化或真实机器人可靠性。
+**背景：** MoRA-Train 需要一个可复现的具身任务来验证分层训练接口。Go2W 轮式四足在已知路径仿真中提供了长程导航、岔路决策和底层控制验证。**目的：** 在本仓库中交付第一个 adapter，并检验“规则 S2 + 学习型 S1 + 可验证 S0”的组合能否完成指定任务。**方法：** 将规则目标/分支决策、PPO 高层导航指令、脚本路径跟踪/C++ S0 执行组合，记录 PPO、BC、DAgger、课程学习和探索性对照。**结果：** 在各自归档的固定仿真协议下，弯道、多段 A→B、岔路分别记录 **20/20、20/20、40/40** 成功；C++ S0 与 scripted S0 在 multi-segment 上逐步一致，10/10 通过。**结论：** 这些证据支持第一个 adapter 的工程可行性，但不单独归因 PPO/BC 的收益，也不证明 MoRA-Train 的记忆/进度模块、未知场景泛化或真实机器人可靠性。
 
-**关键词：** 分层控制；机器人导航；强化学习；PPO；模仿学习；MuJoCo；实验可复核性
+**关键词：** MoRA-inspired；分层具身智能体；机器人导航；强化学习；PPO；MuJoCo；训练可靠性
 
-## 1. 引言与研究问题
+## 1. 第一个 adapter：研究问题
+
+以下 RQ 是 **Go2W adapter 层面**的问题，不是 MoRA-Train 的全部研究问题；系统级的记忆、进度闭环与跨任务问题在后续迭代中回答。
 
 机器人在弯道和连续任务中运动，既要保持自身稳定，又要沿路线调整方向、控制速度并在目标点停下。如果把这些责任全部交给一个底层强化学习策略，学习过程就可能陷入“不动”“乱动”或“无法稳定完成目标”的局部方案。本项目的早期实验确实记录了类似结果，参见[负结果总览](docs/EXPERIMENTS.md)。
 
@@ -28,7 +59,9 @@
 
 **命名与范围边界：** `MoRA-inspired` 指独立借鉴分层思想的工程实现，并非官方 MoRA 模型或训练流程复现。当前 System 2 是规则模块，没有实现学习型 VLM/VLA、语义规划或开放场景导航；仓库也没有真实 Go2W 的部署结果。
 
-## 2. 方法
+## 2. Go2W adapter 的方法
+
+以下方法是 Go2W adapter 的具体实现，不是 MoRA-Train 通用训练系统的完整设计；系统级 Task API、记忆与进度模块在后续迭代中抽象。
 
 ### 2.1 仿真环境与任务
 
@@ -85,7 +118,7 @@ MuJoCo：执行动作 → 返回状态、奖励、任务结果
 需要区分：一次实验内更换 episode seed、独立训练多次以及测试新的场景分布，是三种不同强度的验证。现有多数成功结果只覆盖第一种。
 
 <a id="final-results"></a>
-## 3. 归档实验结果
+## 3. Go2W adapter 的归档实验结果
 
 | 实验 | 记录结果 | 解释范围 | 证据 |
 | --- | --- | --- | --- |
@@ -133,6 +166,7 @@ B+ 历史报告的配置显示 HER 关闭，但文本结论出现过 HER 有效�
 4. **测量有效性：** 进度指标与实际物理路程并不总等价；A 点停靠和 B 点到达使用不同判据。
 5. **结果可复现性：** 成功 PPO 策略的最终 checkpoint、匹配归一化统计和完整训练日志未包含在当前公开快照中；现有代码、精选数据、录像和报告**不等于无需重新训练即可复现成功策略**。
 6. **能力边界：** 规则模块、教师转向和部分制动是脚本逻辑；没有学习型 System 2、开放世界视觉导航或真实机器人的安全认证。
+7. **系统层边界：** 本仓库是 MoRA-Train 的第一个 adapter；多粒度记忆、进度闭环、跨任务 adapter 尚未实现，因此这里的成功/失败不能作为整个训练系统的结论。
 
 ## 6. 复现与实验完整性
 
@@ -173,9 +207,53 @@ pyright rl scripts mujoco_demos
 
 ## 7. 结论与后续工作
 
-仓库提供的是一套有明确边界、可供审查的分层导航工程研究：从单层 PPO 训练失败出发，重新分配控制责任，再对指定任务进行分阶段验证，并保留失败与不一致的原始证据。其价值是**系统设计、控制与学习接口探索、实验诊断及可复核记录**，并非证明一种新 RL 算法普遍优于现有方法。
+本仓库当前交付的是 MoRA-Train 的**第一个 adapter**：一个可审查的 Go2W 分层导航实验床，以及可独立验证的 C++ S0 控制核心。其价值是**层次接口、控制与学习分工、实验诊断和可复核记录**，不是证明一种新 RL 算法，也不是证明整个 MoRA-Train 系统。
 
-下一步需要：统一协议的脚本控制器与 PPO 多训练种子对照、独立场景和域随机化测试、BC/停靠机制的单因素消融、公开匹配的 checkpoint/归一化统计，以及在充分处理感知、时延与安全边界之后开展实机研究。
+下一步按系统层推进：
+
+1. 在 Go2W 之外实现 Task Adapter API，抽象 `reset / step / goal / progress / success`；
+2. 为 S1 加入短期/情节记忆与 progress head，做记忆/进度消融；
+3. 把训练事件流接入 RL-Sentinel，量化跨任务、跨 seed 的早停可靠性；
+4. 补多 seed、域随机化、单因素消融和匹配的 checkpoint/归一化；
+5. 完成 ROS2 P1 垂直切片，再讨论实机边界。
+
+## 8. S0 组件：C++ / ROS2 栈（P0）
+
+在 MoRA-Train 的定位中，本节是 **S0 组件 + 第一个 adapter 的控制层验证**，不是整个训练系统的全部。在现有 Python/MuJoCo 仓库之上新增了一个 **ROS-agnostic C++17 控制核心**，作为可独立验证的 System 0。P0 已完成 C++ core + Python 适配器；ROS2 垂直切片（P1）尚未实现。
+
+**包含：**
+
+- 浮动基座 FK/IK、轮心 Jacobian（对 MuJoCo 夹具 1e-9 / 1e-6）
+- 质心质量/COM/惯性（1e-9 / 1e-8）
+- SRBD 线性 MPC（OSQP，N=20，50 Hz）
+- 接触力 → 轮力矩映射、安全状态机
+- 脚本教师 + 可选 A/B 预减速
+- pybind11 注入现有 `HighLevelEnvWrapper`
+
+**P0 证据（固定 seeds 1000–1009）：**
+
+| 配置 | 成功率 | mean_x | mean_time |
+| --- | ---: | ---: | ---: |
+| scripted，无预减速（历史基线） | 0/10 | 4.7811 | 6.292 s |
+| scripted，预减速 | 10/10 | 10.6571 | 13.990 s |
+| **C++ S0，预减速** | **10/10** | **10.6571** | **13.990 s** |
+
+C++ 与 scripted 预减速逐项相同；seed 1000 的逐步轨迹也完全一致。MPC benchmark：200/200 求解，mean 3.16 ms，p99 4.07 ms，hover 垂直力误差 2.15%。演示视频：[cpp_stack_p0_demo.mp4](media/cpp_stack_p0_demo.mp4)。原生 Windows（MSVC 2026）验证：Python 套件 **225 tests OK（4 skipped）**、绑定 3/3、MPC 200/200（mean 3.88 ms，p99 4.59 ms）、multi-segment **10/10**（mean_x 10.6563，14.000 s）。详见 [Windows 验证](docs/WINDOWS_NATIVE.md)。
+
+**快速开始：**
+
+```bash
+cmake -S cpp -B build/core -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DGO2W_BUILD_TESTS=ON -DGO2W_BUILD_BENCHMARKS=ON
+cmake --build build/core
+.venv/bin/ctest --test-dir build/core --output-on-failure
+./build/core/go2w_mpc_bench
+.venv/bin/python scripts/evaluate_navigation.py \
+  --task multi-segment --method controller --episodes 10 \
+  --s0 cpp --pre-brake --output reports/cpp_stack/p0_cpp_prebrake
+```
+
+**边界：** 仿真-only；无 ROS2 节点、EKF、完整 WBC/RNEA、视觉/触觉、实机或 sim-to-real；MPC 尚未闭环接入 `Go2wEnv`；历史报告成功率不被追认。详见 [C++ 架构](docs/CPP_ROS2_ARCHITECTURE.md) · [控制设计](docs/CONTROL_DESIGN.md) · [标定](docs/CALIBRATION.md) · [验证](docs/VALIDATION.md) · [P0 协议](docs/CPP_STACK_PROTOCOL.md) · [cpp/README](cpp/README.md)。
 
 ## 参考文献
 

@@ -441,6 +441,39 @@ pyright rl scripts mujoco_demos
 
 静态检查工具单独安装；测试与检查结果取决于当前版本和环境，应以实际输出为准。轨迹生成会写入样例目录，重复运行前请备份需要保留的数据。
 
+## C++ / ROS2 System-0（P0）
+
+C++ 控制核心与 Python 适配器的构建、测试和验收：
+
+```bash
+# C++ core + tests + MPC benchmark
+cmake -S cpp -B build/core -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DGO2W_BUILD_TESTS=ON -DGO2W_BUILD_BENCHMARKS=ON
+cmake --build build/core
+.venv/bin/ctest --test-dir build/core --output-on-failure
+./build/core/go2w_mpc_bench
+
+# Python bindings (needed for --s0 cpp)
+cmake -S cpp -B build/py -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DGO2W_BUILD_PYTHON=ON -DGO2W_BUILD_TESTS=OFF \
+  -DGO2W_BUILD_BENCHMARKS=OFF \
+  -Dpybind11_DIR="$(.venv/bin/python -m pybind11 --cmakedir)"
+cmake --build build/py
+
+# C++ S0 acceptance
+.venv/bin/python scripts/evaluate_navigation.py \
+  --task multi-segment --method controller --episodes 10 \
+  --s0 cpp --pre-brake --output reports/cpp_stack/p0_cpp_prebrake
+
+# Demo video
+.venv/bin/python scripts/record_cpp_demo.py --s0 cpp --seed 1000
+```
+
+- `--pre-brake` 复现归档多段脚本的 A/B 预减速；默认关闭。
+- P0 只做仿真；ROS2、EKF、完整 WBC、视觉/触觉和实机未实现。
+- 详细设计见 [CPP_ROS2_ARCHITECTURE.md](CPP_ROS2_ARCHITECTURE.md)、
+  [CONTROL_DESIGN.md](CONTROL_DESIGN.md)、[VALIDATION.md](VALIDATION.md)。
+
 ## 参考文档
 
 - [架构设计](ARCHITECTURE.md) — MoRA 三层架构、观测空间演进、奖励设计

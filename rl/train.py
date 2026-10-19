@@ -12,6 +12,7 @@ import argparse
 import copy
 import csv
 import json
+import os
 import pathlib
 import sys
 from typing import Any
@@ -522,6 +523,12 @@ def main() -> None:
     parser.add_argument("--total-steps", type=int, default=8_000_000)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--envs", type=int, default=8)
+    parser.add_argument(
+        "--device",
+        choices=("auto", "cpu", "cuda", "mps"),
+        default=os.environ.get("GO2W_TRAIN_DEVICE", "cpu"),
+        help="Torch device for PPO; GO2W_TRAIN_DEVICE overrides the default",
+    )
     parser.add_argument("--init-from", type=str, default=None,
                         help="Phase 2 从 Phase 1 最优权重初始化")
     parser.add_argument("--resume-from", type=str, default=None,
@@ -689,6 +696,7 @@ def main() -> None:
             clip_range=0.2,
             policy_kwargs={"net_arch": [256, 256]},
             seed=args.seed,
+            device=args.device,
             verbose=1,
             tensorboard_log=str(tb_dir),
         )
@@ -696,7 +704,7 @@ def main() -> None:
     elif args.resume_from:
         if args.init_from:
             raise SystemExit("--resume-from 与 --init-from 不能同时使用")
-        model = PPO.load(args.resume_from, env=train_env, device="cpu",
+        model = PPO.load(args.resume_from, env=train_env, device=args.device,
                          learning_rate=lr)
         model.tensorboard_log = str(tb_dir)
         steps_done = int(model.num_timesteps)
@@ -709,7 +717,7 @@ def main() -> None:
             print(f"已达标，无需继续。输出目录: {run_dir}")
             return
     elif args.init_from:
-        model = PPO.load(args.init_from, env=train_env, device="cpu",
+        model = PPO.load(args.init_from, env=train_env, device=args.device,
                          learning_rate=lr)
         model.tensorboard_log = str(tb_dir)
         print(f"已从 {args.init_from} 初始化，继续训练 {args.task}")
@@ -727,10 +735,12 @@ def main() -> None:
             clip_range=0.2,
             policy_kwargs={"net_arch": [256, 256]},
             seed=args.seed,
+            device=args.device,
             verbose=1,
             tensorboard_log=str(tb_dir),
         )
 
+    print(f"PPO device: {model.device}")
     print(f"开始训练 task={args.task} seed={args.seed} steps={total_steps} envs={n_envs}")
     callbacks: list[BaseCallback] = [callback]
     if args.norm_freeze_steps > 0:

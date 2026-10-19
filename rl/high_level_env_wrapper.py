@@ -226,6 +226,10 @@ class HighLevelEnvWrapper(gym.Env[np.ndarray, np.ndarray]):
         obs, info = self.base_env.reset(seed=seed, options=base_opts)
         self._current_goal = goal
         self._transitions = []
+        # C++/MPC controllers may keep internal state (warm start, safety FSM).
+        reset_fn = getattr(self.controller, "reset", None)
+        if callable(reset_fn):
+            reset_fn(self.base_env)
         obs = self._maybe_mask_goal(obs)
         self._last_base_obs = np.asarray(obs, dtype=np.float32)
         if self.append_junction and getattr(self.base_env, "junction", False):

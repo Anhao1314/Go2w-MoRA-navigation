@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -28,7 +29,12 @@ if str(PROJECT_ROOT) not in sys.path:
 from rl.go2w_env import Go2wEnv
 
 OUT = PROJECT_ROOT / "data" / "demo_trajectories"
-RUN_ROOT = PROJECT_ROOT / "rl" / "runs" / "traverse_curve_curriculum" / "seed00"
+RUN_ROOT = pathlib.Path(
+    os.environ.get(
+        "GO2W_CURVE_RUN_ROOT",
+        str(PROJECT_ROOT / "rl" / "runs" / "traverse_curve_curriculum" / "seed00"),
+    )
+).expanduser()
 PY = sys.executable
 
 STAGES = [
@@ -40,6 +46,7 @@ STAGES = [
 ENVS = 4
 STAGE_STEPS = 1_000_000
 LR = 3e-4
+DEVICE = os.environ.get("GO2W_TRAIN_DEVICE", "cpu")
 
 
 def eval_stage(corridor: float, amp: float, model_path: pathlib.Path,
@@ -50,7 +57,7 @@ def eval_stage(corridor: float, amp: float, model_path: pathlib.Path,
                     reward_version="simple")
     vec = VecNormalize.load(str(norm_path), DummyVecEnv([lambda: proto]))
     vec.training = False
-    model = PPO.load(str(model_path), device="cpu")
+    model = PPO.load(str(model_path), device=DEVICE)
     suc = 0
     dists: list[float] = []
     lens: list[int] = []
@@ -96,6 +103,7 @@ def main() -> None:
             "--curve-amplitude", str(stage["amp"]),
             "--reward-version", "simple",
             "--learning-rate", str(LR),
+            "--device", DEVICE,
             "--run-dir", str(run_dir),
         ]
         if prev_best is not None:
