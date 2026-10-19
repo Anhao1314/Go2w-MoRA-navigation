@@ -30,12 +30,12 @@ Go2W is the **first task adapter and experiment bed** for MoRA-Train. It tests:
 | --- | --- | --- |
 | S2 | Task decomposition, branch/skill selection | Rule-based inside the Go2W adapter |
 | S1 | Goal-conditioned policy | PPO / BC / DAgger / curriculum learning |
-| Memory | Short-term / episodic / task memory | Planned; current observations use history and stage context |
-| Progress | Progress estimation, stall detection, replanning | Planned; current task-progress metrics only |
+| Memory | Short-term / episodic / task memory | `mora/` skeleton implemented; neural Memory Token pending |
+| Progress | Progress estimation, stall detection, replanning | `mora/` heuristic implemented; learned progress head pending |
 | S0 | Motion control, MPC, safety state machine | P0 delivered and numerically validated |
-| Observability | Event stream, as-of early-stop analysis | RL-Sentinel (separate repository) |
+| Observability | Event stream, as-of early-stop analysis | `EventWriter` + SB3 callback implemented; RL-Sentinel ingester pending |
 
-Results in this repository therefore establish feasibility of the **first adapter**, not the whole MoRA-Train system, and not a reproduction of official MoRA.
+See [MoRA-Train system layer](docs/MORA_TRAIN.md) for the interfaces and current capabilities. Results in this repository therefore establish feasibility of the **first adapter**, not the whole MoRA-Train system, and not a reproduction of official MoRA.
 
 ## Abstract
 
