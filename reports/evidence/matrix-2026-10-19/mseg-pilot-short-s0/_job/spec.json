@@ -1,0 +1,37 @@
+{
+  "job_id": "mseg-pilot-short-s0",
+  "created_at": "2026-10-19T12:03:53.081575+00:00",
+  "cwd": "D:/work/go2w",
+  "command": [
+    "D:/work/go2w/.venv/Scripts/python.exe",
+    "-u",
+    "scripts/train_multi_segment_curriculum.py",
+    "--seed",
+    "0",
+    "--device",
+    "cpu",
+    "--run-root",
+    "D:/work/go2w/rl/runs/multi_segment/mseg-pilot-short-s0",
+    "--budget-scale",
+    "0.05"
+  ],
+  "log": "D:/work/go2w/rl/runs/_jobs/mseg-pilot-short-s0/train.log",
+  "env": {
+    "PYTHONUNBUFFERED": "1",
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
+    "MUJOCO_GL": "wgl",
+    "GO2W_TRAIN_DEVICE": "cpu",
+    "GO2W_SOURCE_COMMIT": "2453d6cf98fac30eb24d711cbf4f0d6400c0979b",
+    "GO2W_SOURCE_DIRTY": "true"
+  },
+  "task": "multi-segment",
+  "seed": 0,
+  "run_dir": "D:/work/go2w/rl/runs/multi_segment/mseg-pilot-short-s0",
+  "source": {
+    "commit": "2453d6cf98fac30eb24d711cbf4f0d6400c0979b",
+    "dirty": true,
+    "dirty_files": 2,
+    "host": "yangyimingdeMacBook-Air.local"
+  }
+}

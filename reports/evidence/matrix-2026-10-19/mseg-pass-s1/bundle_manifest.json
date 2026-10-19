@@ -1,0 +1,67 @@
+{
+  "schema_version": "go2w-evidence-v1",
+  "created_at": "2026-10-19T13:46:22.581211+00:00",
+  "source_run": "/Users/yimingyang/Documents/Codex/2026-10-05/wo/Go2w-MoRA-navigation/rl/runs/_fetched/mseg-pass-s1",
+  "members": [
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/run_config.json",
+      "bytes": 2800,
+      "sha256": "beaa3ebc348499ec143dc76f3cda7adb95e04131c737f329b439f08c56f84e93"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/events.jsonl",
+      "bytes": 48983,
+      "sha256": "e398ede230cf80931dd5c8a515b3a58708b446ee2c35865f082179f750e81536"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/stage1/eval_log.csv",
+      "bytes": 256,
+      "sha256": "68d3ab4ed5b12d4b51d1c3d3dbca742bbb80d17816fbbd493a2e8f3d145bccc9"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/stage2/eval_log.csv",
+      "bytes": 255,
+      "sha256": "2da46b83e600303dec5199893d07b6915ce6fe9454617582c4d8211bb00cbd29"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/stage3/eval_log.csv",
+      "bytes": 263,
+      "sha256": "18c66bff660f0d8e1a5e74b297c6c1e4607c294efae0ede796ada1db0437809e"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/evaluation/summary.json",
+      "bytes": 914,
+      "sha256": "f0e25ff9573f0071ca442041afb8f13a7b32a871c480a26a25469b4ca0db7649"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/evaluation/episodes.json",
+      "bytes": 4485,
+      "sha256": "7db377ac753a6fcbf2db727bde636c8ad11c34cc8e5adbc56c4349fe7e9ac747"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/evaluation/metrics.csv",
+      "bytes": 187,
+      "sha256": "91e77c1553389fcb8b5d9a957d256cc33717b4a99b081b8c89572bfc3f04126d"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/evaluation/report.md",
+      "bytes": 471,
+      "sha256": "00351bb81b02ba99a0b35473ced700bba879f3cfc90245dea6e2081add3c2e89"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/_job/spec.json",
+      "bytes": 940,
+      "sha256": "f0bcc21c1b59476aed7f2243ef47a57105e0a00eaf49f081a1a668f60a2e8518"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/_job/meta.json",
+      "bytes": 882,
+      "sha256": "fd3dcce91b99ca3fd9d05225c562b27395e34640919cb2a8420fee1d70788dc0"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pass-s1/_job/train.log",
+      "bytes": 5661,
+      "sha256": "c02804894afbc0b4b764a0e058c824709e6b979743f9cfddeda17cb2a8f5185b"
+    }
+  ]
+}

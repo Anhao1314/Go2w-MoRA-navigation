@@ -1,0 +1,91 @@
+{
+  "schema_version": "navigation-integrity-v1",
+  "created_at": "2026-10-19T12:04:00.896042+00:00",
+  "config": {
+    "task": "traverse_curve_multi_segment",
+    "seed": 0,
+    "envs": 4,
+    "smoke": false,
+    "record": false,
+    "observation_dim": 67,
+    "action_dim": 2,
+    "domain_randomize": false,
+    "stages": [
+      {
+        "name": "stage1",
+        "scope": 0,
+        "start_a": false,
+        "steps": 25000,
+        "threshold": 0.8
+      },
+      {
+        "name": "stage2",
+        "scope": 1,
+        "start_a": true,
+        "steps": 25000,
+        "threshold": 0.8
+      },
+      {
+        "name": "stage3",
+        "scope": 2,
+        "start_a": false,
+        "steps": 50000,
+        "threshold": 0.6
+      }
+    ],
+    "budget_scale": 0.05,
+    "no_bc": true,
+    "smoke_steps_per_stage": null,
+    "validation_seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "acceptance_seeds": [
+      1000,
+      1001,
+      1002,
+      1003,
+      1004,
+      1005,
+      1006,
+      1007,
+      1008,
+      1009,
+      1010,
+      1011,
+      1012,
+      1013,
+      1014,
+      1015,
+      1016,
+      1017,
+      1018,
+      1019
+    ],
+    "normalization_layers": 1,
+    "ent_coef": 0.005,
+    "learning_rate": {
+      "start": 5e-05,
+      "end": 0.00015,
+      "warmup_steps": 100000
+    },
+    "distribution": "fixed_scene_repetition_not_generalization"
+  },
+  "runtime": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "numpy": "2.5.4",
+      "torch": "2.14.1+cu130",
+      "mujoco": "3.11.0",
+      "gymnasium": "1.4.0",
+      "stable-baselines3": "2.9.0"
+    },
+    "source_commit": "2453d6cf98fac30eb24d711cbf4f0d6400c0979b",
+    "source_dirty": true
+  },
+  "inputs": {}
+}

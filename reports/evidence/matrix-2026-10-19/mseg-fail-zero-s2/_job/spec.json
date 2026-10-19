@@ -1,0 +1,41 @@
+{
+  "job_id": "mseg-fail-zero-s2",
+  "created_at": "2026-10-19T12:44:02.004727+00:00",
+  "cwd": "D:/work/go2w",
+  "command": [
+    "D:/work/go2w/.venv/Scripts/python.exe",
+    "-u",
+    "scripts/train_multi_segment_curriculum.py",
+    "--seed",
+    "2",
+    "--device",
+    "cpu",
+    "--run-root",
+    "D:/work/go2w/rl/runs/multi_segment/mseg-fail-zero-s2",
+    "--s0",
+    "zero",
+    "--budget-scale",
+    "0.05",
+    "--event-interval",
+    "1000"
+  ],
+  "log": "D:/work/go2w/rl/runs/_jobs/mseg-fail-zero-s2/train.log",
+  "env": {
+    "PYTHONUNBUFFERED": "1",
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
+    "MUJOCO_GL": "wgl",
+    "GO2W_TRAIN_DEVICE": "cpu",
+    "GO2W_SOURCE_COMMIT": "f1a6a4eec0366d4c76d361a424aef58a3c480a45",
+    "GO2W_SOURCE_DIRTY": "true"
+  },
+  "task": "multi-segment",
+  "seed": 2,
+  "run_dir": "D:/work/go2w/rl/runs/multi_segment/mseg-fail-zero-s2",
+  "source": {
+    "commit": "f1a6a4eec0366d4c76d361a424aef58a3c480a45",
+    "dirty": true,
+    "dirty_files": 1,
+    "host": "yangyimingdeMacBook-Air.local"
+  }
+}

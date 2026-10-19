@@ -1,0 +1,2 @@
+label,task,success_rate,a_stop_rate,mean_x,mean_ep_len,mean_time,failed_terminations
+RL multi-segment,traverse_curve_multi_segment,1.0,1.0,10.660159989391389,1395.0,13.95000000000133,0

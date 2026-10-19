@@ -88,6 +88,15 @@ python scripts/collect_run_evidence.py \
 - 事件流：每 5000 步一个 sample；最终验收后写 `finish` 和 `pass/fail/unknown` label。
 - 目前 `run_config.runtime.source_commit` 仍为 null（该 run 启动于 provenance env 注入之前）；以 `_job/spec.json` 为准。后续 run 会直接写入 `run_config.runtime`。
 
+### 5.1 18-run observed 矩阵（2026-10-19）
+
+- 数据集：`5fd1ca77bcbf4230`，18 条 observed run（6 pass / 12 fail）+ 48 条 legacy run。
+- pass 组：1 条 full-budget、2 条 short-budget/no-BC pilot、3 条 full-budget seeds 1–3。
+- fail 组：12 条 zero-S0 消融（seeds 0–5 × 两种预算）。pilot 显示短预算和 no-BC 单独仍能通过，因此负样本改用 zero-S0。
+- 结果：observed readiness 为 `candidate_for_external_validation`；`rules-v2` 在 30% checkpoint 为 2 true stops / 1 false stop / 10 missed，50% 和 70% 没有停止建议。
+- 证据：`reports/evidence/matrix-2026-10-19/`，18 个 compact bundle，约 1.5 MB。
+- 限制：全部为 multi-segment；zero-S0 是受控负样本，不能外推为自然训练失败。
+
 ## 6. 尚未记录、后续补充
 
 | 缺口 | 影响 | 计划 |

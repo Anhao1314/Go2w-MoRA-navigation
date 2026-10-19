@@ -1,0 +1,113 @@
+{
+  "schema_version": "navigation-integrity-v1",
+  "created_at": "2026-10-19T13:12:36.665992+00:00",
+  "config": {
+    "task": "traverse_curve_multi_segment",
+    "seed": 1,
+    "envs": 4,
+    "smoke": false,
+    "record": false,
+    "observation_dim": 67,
+    "action_dim": 2,
+    "domain_randomize": false,
+    "stages": [
+      {
+        "name": "stage1",
+        "scope": 0,
+        "start_a": false,
+        "steps": 10000,
+        "threshold": 0.8
+      },
+      {
+        "name": "stage2",
+        "scope": 1,
+        "start_a": true,
+        "steps": 10000,
+        "threshold": 0.8
+      },
+      {
+        "name": "stage3",
+        "scope": 2,
+        "start_a": false,
+        "steps": 20000,
+        "threshold": 0.6
+      }
+    ],
+    "budget_scale": 0.02,
+    "no_bc": false,
+    "s0": "zero",
+    "smoke_steps_per_stage": null,
+    "validation_seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "acceptance_seeds": [
+      1000,
+      1001,
+      1002,
+      1003,
+      1004,
+      1005,
+      1006,
+      1007,
+      1008,
+      1009,
+      1010,
+      1011,
+      1012,
+      1013,
+      1014,
+      1015,
+      1016,
+      1017,
+      1018,
+      1019
+    ],
+    "normalization_layers": 1,
+    "ent_coef": 0.005,
+    "learning_rate": {
+      "start": 5e-05,
+      "end": 0.00015,
+      "warmup_steps": 100000
+    },
+    "distribution": "fixed_scene_repetition_not_generalization"
+  },
+  "runtime": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "numpy": "2.5.4",
+      "torch": "2.14.1+cu130",
+      "mujoco": "3.11.0",
+      "gymnasium": "1.4.0",
+      "stable-baselines3": "2.9.0"
+    },
+    "source_commit": "f1a6a4eec0366d4c76d361a424aef58a3c480a45",
+    "source_dirty": true
+  },
+  "inputs": {
+    "bc_model": {
+      "path": "D:\\work\\go2w\\data\\demo_trajectories\\multi_segment_bc_pretrain.zip",
+      "bytes": 690083,
+      "sha256": "abb4d1c97e9c20fc0e46db74edf41c16c1be21887816dbfc51fc20c8bedf9813"
+    },
+    "bc_norm": {
+      "path": "D:\\work\\go2w\\data\\demo_trajectories\\multi_segment_bc_vecnorm.pkl",
+      "bytes": 722,
+      "sha256": "0bca7401067ed8ec807b008fd245768bae8437286bf3c38cdaf9f2cf954b49f1"
+    },
+    "stage2_bc_model": {
+      "path": "D:\\work\\go2w\\data\\demo_trajectories\\multi_segment_stage2_bc_pretrain.zip",
+      "bytes": 690083,
+      "sha256": "be909f4177595679f996b2d9e1569cff54b5205165637ec9cee1dbd3bdc2fa22"
+    },
+    "stage2_bc_norm": {
+      "path": "D:\\work\\go2w\\data\\demo_trajectories\\multi_segment_stage2_bc_vecnorm.pkl",
+      "bytes": 722,
+      "sha256": "a0b6cfa0bc1c741eda9f1c282e689cd2b67ea597a90a6c0f3f492f2e47b05cd1"
+    }
+  }
+}

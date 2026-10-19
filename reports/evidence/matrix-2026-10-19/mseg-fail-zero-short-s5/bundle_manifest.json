@@ -1,0 +1,67 @@
+{
+  "schema_version": "go2w-evidence-v1",
+  "created_at": "2026-10-19T13:46:22.528045+00:00",
+  "source_run": "/Users/yimingyang/Documents/Codex/2026-10-05/wo/Go2w-MoRA-navigation/rl/runs/_fetched/mseg-fail-zero-short-s5",
+  "members": [
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/run_config.json",
+      "bytes": 2793,
+      "sha256": "daf0ede4bcc3f2f4c0ac9a696b777138a01041f89abd30aa9e37bfe0c2156959"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/events.jsonl",
+      "bytes": 18977,
+      "sha256": "d9f337cd1f62dc9af4790f2c7df4b9d3c16d23dc38ae0c275f4ea325d63a3ef2"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/stage1/eval_log.csv",
+      "bytes": 67,
+      "sha256": "e345befb703dcd1d2a504b64ed03d56b723ef3b5e0be725506509543bd1045ee"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/stage2/eval_log.csv",
+      "bytes": 67,
+      "sha256": "e345befb703dcd1d2a504b64ed03d56b723ef3b5e0be725506509543bd1045ee"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/stage3/eval_log.csv",
+      "bytes": 67,
+      "sha256": "e345befb703dcd1d2a504b64ed03d56b723ef3b5e0be725506509543bd1045ee"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/evaluation/summary.json",
+      "bytes": 923,
+      "sha256": "c697d72d409990933f5a2b85fd8bed6ca1a935f237b946ae213ed38ab6717deb"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/evaluation/episodes.json",
+      "bytes": 4165,
+      "sha256": "ae7423e008f3ec62c4f4b9b3f0b6625d36b9f581a810ba8e5a6fc2b1cf3630ae"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/evaluation/metrics.csv",
+      "bytes": 173,
+      "sha256": "10161a1edd663e356187a4ef16b3813672777d917161e09758dd399239d0dc4a"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/evaluation/report.md",
+      "bytes": 476,
+      "sha256": "0e8062091b2d4fc4a19172411ccf7172607a34a75a47afe090a47b6d73325ae0"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/_job/spec.json",
+      "bytes": 1078,
+      "sha256": "1a55d8d71ab15eefbff1e9fad84a1210d8b540b3e9d450f1af586094fd3bf254"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/_job/meta.json",
+      "bytes": 1037,
+      "sha256": "3d7d79b35e99ed8f2ee190cee814e5cd67d148e20d2e2c7bf46a8f380a439a0f"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-fail-zero-short-s5/_job/train.log",
+      "bytes": 4234,
+      "sha256": "1674c6f4d03ff72bf0135a02fe6305392a4f68b392bb472918e3459f9363260a"
+    }
+  ]
+}

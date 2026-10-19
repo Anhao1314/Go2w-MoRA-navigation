@@ -1,0 +1,67 @@
+{
+  "schema_version": "go2w-evidence-v1",
+  "created_at": "2026-10-19T13:46:22.790655+00:00",
+  "source_run": "/Users/yimingyang/Documents/Codex/2026-10-05/wo/Go2w-MoRA-navigation/rl/runs/_fetched/mseg-pilot-short-s0",
+  "members": [
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/run_config.json",
+      "bytes": 2774,
+      "sha256": "3c6b89ade2e881cc919ff53d17644a0e36f82d94d69300764c47d1effa2bf568"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/events.jsonl",
+      "bytes": 8534,
+      "sha256": "59663b21a48d5500f79843618daace051436f966ff85d0ad560c2856b8951140"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/stage1/eval_log.csv",
+      "bytes": 67,
+      "sha256": "e345befb703dcd1d2a504b64ed03d56b723ef3b5e0be725506509543bd1045ee"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/stage2/eval_log.csv",
+      "bytes": 67,
+      "sha256": "e345befb703dcd1d2a504b64ed03d56b723ef3b5e0be725506509543bd1045ee"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/stage3/eval_log.csv",
+      "bytes": 106,
+      "sha256": "a9d0cc46ebf342cd7cd709b1930cc67031e1233bf2d16521388aa454c05b4ccd"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/evaluation/summary.json",
+      "bytes": 930,
+      "sha256": "eb3c5239af2e0a86efead89c61433b64364ee1ee46f44a908d6bff4f26a213b0"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/evaluation/episodes.json",
+      "bytes": 4465,
+      "sha256": "2bcc386d04204d5dfaa6f08cc3409861bb40c2e468d4df82b1dde1bd77e1f305"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/evaluation/metrics.csv",
+      "bytes": 188,
+      "sha256": "e139ce1850448246ebf44175faf4693e4afa2422ba17d1913a3482415ba02b35"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/evaluation/report.md",
+      "bytes": 478,
+      "sha256": "cf8a3fcbeca76ebc67a55ef3ae6aae5c7f228c74be966ceee68cc0c197438db8"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/_job/spec.json",
+      "bytes": 1002,
+      "sha256": "e18acfe7ea48248be1e4d91c6474af43bd214d726a084577448a5df7016b585d"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/_job/meta.json",
+      "bytes": 954,
+      "sha256": "bc936fa5c9beef17b28bb13be4be416db469aedea7b5ba86ddea0d5fdf3f1c12"
+    },
+    {
+      "path": "reports/evidence/matrix-2026-10-19/mseg-pilot-short-s0/_job/train.log",
+      "bytes": 4555,
+      "sha256": "c62d4654efb1176855f42b950731c4c85c4f2e5c66466a499e90dc3fa971a4f1"
+    }
+  ]
+}
