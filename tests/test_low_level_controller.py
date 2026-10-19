@@ -6,7 +6,7 @@ import mujoco
 import numpy as np
 
 from rl.go2w_env import Go2wEnv, curve_center_y
-from rl.low_level_controller import LowLevelController
+from rl.low_level_controller import LowLevelController, ZeroLowLevelController
 from scripts.gen_demo_trajectory import (
     compute_teacher_action,
     default_params,
@@ -21,6 +21,13 @@ class LowLevelControllerTest(unittest.TestCase):
         a = self.controller.compute_action(1.0, 0.0, 0.0, {})
         self.assertEqual(a.shape, (6,))
         self.assertEqual(a.dtype, np.float32)
+
+    def test_zero_controller_is_a_controlled_ablation(self):
+        controller = ZeroLowLevelController()
+        action = controller.compute_action(
+            1.0, 0.0, 0.0, {"speed_scale": 1.5, "turn_adjust": 0.5}
+        )
+        np.testing.assert_array_equal(action, np.zeros(6, dtype=np.float32))
 
     def test_default_matches_teacher(self):
         p = default_params()

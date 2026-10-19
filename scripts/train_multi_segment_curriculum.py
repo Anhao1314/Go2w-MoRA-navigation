@@ -101,6 +101,9 @@ def make_stage_env(scope: int, start_a: bool, s0: str = "scripted",
             controller = MultiSegmentLowLevelController(
                 base.segments, pre_brake=True
             )
+    elif s0 == "zero":
+        from rl.low_level_controller import ZeroLowLevelController
+        controller = ZeroLowLevelController()
     else:
         raise ValueError(f"unknown S0 backend: {s0}")
     return MsegWrapper(base, scope=scope, start_a=start_a, controller=controller)
@@ -344,6 +347,13 @@ def main() -> None:
     parser.add_argument("--stage2-bc-norm", type=str,
                         default=str(PROJECT_ROOT / "data" / "demo_trajectories" / "multi_segment_stage2_bc_vecnorm.pkl"))
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--no-bc", action="store_true",
+                        help="Ablation: initialize stage1 PPO from scratch instead of BC")
+    parser.add_argument("--budget-scale", type=float, default=1.0,
+                        help="Scale every curriculum stage's step budget; (0, 1]")
+    parser.add_argument("--s0", choices=("scripted", "cpp", "zero"),
+                        default="scripted",
+                        help="Low-level controller; zero is a controlled negative ablation")
     parser.add_argument("--event-log", type=str, default=None,
                         help="Event JSONL path; defaults to <run-root>/events.jsonl")
     parser.add_argument("--no-event-log", action="store_true",
@@ -355,12 +365,20 @@ def main() -> None:
     n_envs = 2 if args.smoke else args.envs
     if n_envs < 1 or args.seed < 0:
         parser.error("envs must be positive and seed non-negative")
+    if not 0.0 < args.budget_scale <= 1.0:
+        parser.error("budget-scale must be in (0, 1]")
+    stages = [
+        {**stage, "steps": max(1, int(round(stage["steps"] * args.budget_scale)))}
+        for stage in STAGES
+    ]
     eval_episodes = 2 if args.smoke else 20
     config = {
         "task": "traverse_curve_multi_segment", "seed": args.seed,
         "envs": n_envs, "smoke": args.smoke, "record": args.record,
         "observation_dim": 67, "action_dim": 2,
-        "domain_randomize": False, "stages": STAGES,
+        "domain_randomize": False, "stages": stages,
+        "budget_scale": args.budget_scale, "no_bc": args.no_bc,
+        "s0": args.s0,
         "smoke_steps_per_stage": 10000 if args.smoke else None,
         "validation_seeds": list(range(EVAL_EPISODES)),
         "acceptance_seeds": acceptance_seeds(eval_episodes),
@@ -369,10 +387,12 @@ def main() -> None:
                           "warmup_steps": 1000 if args.smoke else 100000},
         "distribution": "fixed_scene_repetition_not_generalization",
     }
+    inputs = {} if args.no_bc else {
+        "bc_model": args.bc_model, "bc_norm": args.bc_norm,
+        "stage2_bc_model": args.stage2_bc_model, "stage2_bc_norm": args.stage2_bc_norm,
+    }
     run_root = start_run(
-        PROJECT_ROOT, "traverse_curve_multi_segment", config,
-        {"bc_model": args.bc_model, "bc_norm": args.bc_norm,
-         "stage2_bc_model": args.stage2_bc_model, "stage2_bc_norm": args.stage2_bc_norm},
+        PROJECT_ROOT, "traverse_curve_multi_segment", config, inputs,
         requested=args.run_root,
     )
     report_dir = run_root / ("smoke_evaluation" if args.smoke else "evaluation")
@@ -380,7 +400,7 @@ def main() -> None:
     event_callback: Sb3EventCallback | None = None
     if not args.no_event_log:
         planned_steps = sum(
-            10_000 if args.smoke else int(stage["steps"]) for stage in STAGES
+            10_000 if args.smoke else int(stage["steps"]) for stage in stages
         )
         event_path = (
             pathlib.Path(args.event_log)
@@ -404,7 +424,7 @@ def main() -> None:
     prev_norm = None
     stage_offset = 0
 
-    for stage in STAGES:
+    for stage in stages:
         stage_dir = run_root / stage["name"]
         stage_dir.mkdir(parents=True, exist_ok=True)
         steps: int = 10_000 if args.smoke else int(stage["steps"])
@@ -418,14 +438,28 @@ def main() -> None:
             steps,
         )
         raw_env = make_vec_env(
-            lambda: make_stage_env(stage["scope"], stage["start_a"]),
+            lambda: make_stage_env(stage["scope"], stage["start_a"], s0=args.s0),
             n_envs=n_envs,
             seed=args.seed,
             vec_env_cls=DummyVecEnv,
         )
-        restore_norm = prev_norm if stage["name"] == "stage3" else None
+        restore_norm = prev_norm if (
+            stage["name"] == "stage3" or (args.no_bc and stage["name"] != "stage1")
+        ) else None
         train_env = normalize_once(raw_env, checkpoint=restore_norm)
-        if stage["name"] == "stage1":
+        if args.no_bc:
+            if stage["name"] == "stage1":
+                model = PPO(
+                    "MlpPolicy", train_env,
+                    policy_kwargs={"net_arch": [256, 256]},
+                    device=args.device, learning_rate=lr, seed=args.seed,
+                    verbose=0,
+                )
+            else:
+                assert prev_best is not None and prev_norm is not None
+                model = PPO.load(str(prev_best), env=train_env, device=args.device,
+                                 learning_rate=lr, seed=args.seed)
+        elif stage["name"] == "stage1":
             nd = load_norm_dict(pathlib.Path(args.bc_norm))
             obs_rms: Any = train_env.obs_rms
             obs_rms.mean = np.asarray(nd["mean"], dtype=np.float32)
@@ -493,7 +527,7 @@ def main() -> None:
     dummy = make_stage_env(scope=2, start_a=False)
     vec = normalize_once(DummyVecEnv([lambda: dummy]), checkpoint=prev_norm, training=False)
     model = PPO.load(str(prev_best), device=args.device)
-    acc = final_acceptance(model, vec, episodes=eval_episodes)
+    acc = final_acceptance(model, vec, episodes=eval_episodes, s0=args.s0)
     write_json_new(report_dir / "episodes.json", acc["episode_records"])
     print("最终验收:", acc)
     (report_dir / "metrics.csv").write_text(
