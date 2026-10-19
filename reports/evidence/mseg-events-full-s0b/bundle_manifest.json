@@ -1,0 +1,67 @@
+{
+  "schema_version": "go2w-evidence-v1",
+  "created_at": "2026-10-19T09:54:23.292918+00:00",
+  "source_run": "/Users/yimingyang/Documents/Codex/2026-10-05/wo/Go2w-MoRA-navigation/rl/runs/_fetched/mseg-events-full-s0b",
+  "members": [
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/run_config.json",
+      "bytes": 2692,
+      "sha256": "43d3c0f175f87ceaf7f99ae3b2dd09814087154a787855bdbba9474729261be8"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/events.jsonl",
+      "bytes": 61623,
+      "sha256": "46f4e1afdcec91d27865e2b6dbe6cfce18be37750df5691b196dcfc905c4739a"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/stage1/eval_log.csv",
+      "bytes": 255,
+      "sha256": "3db3a8fc251f171abcc8de2b1a8fc74cb0122529b6acc63e8302447fdda2bb0e"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/stage2/eval_log.csv",
+      "bytes": 256,
+      "sha256": "a395d4a74a3f93e5dfcdabb9bbbdfdc072360c236b38805bc70693654339bb83"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/stage3/eval_log.csv",
+      "bytes": 380,
+      "sha256": "19f0e4f9f959856d7d517362d3e0a9cdb0c71b2c93b4c611ff386acb8a3480a1"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/evaluation/summary.json",
+      "bytes": 930,
+      "sha256": "870e27ff950231537dc777aa30894f4f8d778dcc17e6dfba4cf2f65f61cc520b"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/evaluation/episodes.json",
+      "bytes": 4485,
+      "sha256": "d0b99222848d06e73e81d2f69b2135e03accffa80d1f7578f2fa314c6510d134"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/evaluation/metrics.csv",
+      "bytes": 187,
+      "sha256": "e9f8a3d359021628bac677b3a0df02adfd67a345b78e7737225db43f7698bd07"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/evaluation/report.md",
+      "bytes": 479,
+      "sha256": "d3fdddacd6281ba0076dab59ef0fdf2d71626be5df92ed34e1074c2c2844a7de"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/_job/spec.json",
+      "bytes": 869,
+      "sha256": "df57cf1b51bd0544cd195a8f6e3bf0cd50afb5f9011ca39376c2f8c249f02f1e"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/_job/meta.json",
+      "bytes": 849,
+      "sha256": "2a825a12203db3e558cf8ce21a7e93f45aeb14d67a1f3bc1683ebcc54dec10d1"
+    },
+    {
+      "path": "reports/evidence/mseg-events-full-s0b/_job/train.log",
+      "bytes": 5893,
+      "sha256": "0341d6c0a13af1ad03bee672811884473c92c2d5e8d7473349ebea79ea2c9226"
+    }
+  ]
+}

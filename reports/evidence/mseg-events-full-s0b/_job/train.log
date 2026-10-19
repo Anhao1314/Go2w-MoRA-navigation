@@ -1,0 +1,44 @@
+
+=== job mseg-events-full-s0b started 2026-10-19T09:10:13.294022+00:00 ===
+cwd: D:/work/go2w
+command: ["D:/work/go2w/.venv/Scripts/python.exe", "-u", "scripts/train_multi_segment_curriculum.py", "--seed", "0", "--device", "cpu", "--run-root", "D:/work/go2w/rl/runs/multi_segment/mseg-events-full-s0b"]
+PPO device: cpu
+
+===== stage1 scope=0 steps=500000 =====
+[norm-freeze] 4 步冻结 obs_rms
+[mseg-eval] t=50000 success=100% x=4.31 ep_len=619 passed=100%
+[mseg-eval] t=100000 success=100% x=4.37 ep_len=638 passed=100%
+[mseg-eval] t=150000 success=100% x=4.37 ep_len=638 passed=100%
+[mseg-best] x=4.348 @ 150000
+[mseg-eval] t=200000 success=100% x=4.37 ep_len=624 passed=100%
+[mseg-best] x=4.368 @ 200000
+[mseg-eval] t=250000 success=100% x=4.37 ep_len=627 passed=100%
+[mseg-best] x=4.368 @ 250000
+PPO device: cpu
+
+===== stage2 scope=1 steps=500000 =====
+[norm-freeze] 4 步冻结 obs_rms
+[mseg-eval] t=50000 success=100% x=10.67 ep_len=902 passed=100%
+[mseg-eval] t=100000 success=100% x=10.67 ep_len=914 passed=100%
+[mseg-eval] t=150000 success=100% x=10.65 ep_len=904 passed=100%
+[mseg-best] x=10.667 @ 150000
+[mseg-eval] t=200000 success=100% x=10.65 ep_len=903 passed=100%
+[mseg-eval] t=250000 success=100% x=10.66 ep_len=883 passed=100%
+PPO device: cpu
+
+===== stage3 scope=2 steps=1000000 =====
+[norm-freeze] 150004 步冻结 obs_rms
+[mseg-eval] t=200000 success=100% x=10.66 ep_len=1545 passed=100%
+[mseg-eval] t=250000 success=0% x=4.30 ep_len=617 passed=0%
+[mseg-eval] t=300000 success=0% x=4.54 ep_len=751 passed=100%
+[mseg-eval] t=350000 success=100% x=10.66 ep_len=1511 passed=100%
+[mseg-eval] t=400000 success=100% x=10.66 ep_len=1481 passed=100%
+[mseg-eval] t=450000 success=100% x=10.66 ep_len=1472 passed=100%
+[mseg-best] x=10.660 @ 450000
+[mseg-eval] t=500000 success=100% x=10.66 ep_len=1428 passed=100%
+[mseg-best] x=10.661 @ 500000
+[norm-freeze] 500000 步解冻 obs_rms
+[mseg-eval] t=550000 success=100% x=10.65 ep_len=1256 passed=100%
+最终验收: {'success_rate': 1.0, 'a_stop_rate': 1.0, 'mean_x': 10.663542710410024, 'mean_ep_len': 1428.0, 'mean_time': 14.28000000000144, 'failed_terminations': 0, 'episodes': 20, 'episode_records': [{'seed': 1000, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1001, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1002, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1003, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1004, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1005, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1006, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1007, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1008, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1009, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1010, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1011, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1012, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1013, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1014, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1015, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1016, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1017, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1018, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}, {'seed': 1019, 'success': True, 'max_progress': 10.663542710410026, 'steps': 1428, 'time_seconds': 14.280000000001438, 'terminated': False, 'truncated': True, 'a_stop': True}]}
+报告: D:\work\go2w\rl\runs\multi_segment\mseg-events-full-s0b\evaluation\report.md
+=== job mseg-events-full-s0b finished exit=0 2026-10-19T09:51:36.543974+00:00 ===

@@ -79,10 +79,11 @@ python scripts/collect_run_evidence.py \
 
 ## 5. 当前 run 的记录状态
 
-`mseg-events-full-s0b`（2026-10-19）：
+`mseg-events-full-s0b`（2026-10-19，已完成）：
 
-- 任务：multi-segment，seed 0，CPU，2M steps。
-- 已保存：`run_config.json`、`events.jsonl`、stage1 完整 checkpoint/eval/TensorBoard、stage2 进行中的 eval/TensorBoard。
+- 任务：multi-segment，seed 0，CPU，计划 2M steps；3 个 curriculum stage 全部完成并提前停止，事件步 900k。
+- 已归档：`reports/evidence/mseg-events-full-s0b/`（120 KB），含 `run_config.json`、`events.jsonl`、3 个 stage 的 `eval_log.csv`、`evaluation/summary.json`、`episodes.json`、`metrics.csv`、`_job/spec.json`、`train.log` 和 `bundle_manifest.json`。
+- 最终验收：20 episodes，success_rate 1.0，mean_x 10.6635，mean_ep_len 1428，label `pass`。
 - 源提交：`_job/spec.json` 记录 `c599d7f`，dirty 1（`terrain.STL` 大小写幻影，不进入提交）。
 - 事件流：每 5000 步一个 sample；最终验收后写 `finish` 和 `pass/fail/unknown` label。
 - 目前 `run_config.runtime.source_commit` 仍为 null（该 run 启动于 provenance env 注入之前）；以 `_job/spec.json` 为准。后续 run 会直接写入 `run_config.runtime`。
@@ -106,6 +107,6 @@ python scripts/collect_run_evidence.py \
 - [ ] `stage*/eval_log.csv` 或 TensorBoard：训练曲线
 - [ ] `evaluation/summary.json` + `episodes.json`：最终结果与分母
 - [ ] checkpoint + `VecNormalize`：可回放
-- [ ] `evidence_manifest.json`：SHA-256 清单
+- [ ] `evidence_manifest.json`（完整 run）或 `bundle_manifest.json`（紧凑归档）：SHA-256 清单
 - [ ] 明确写出 fixed-scene / no-domain-randomization / simulation-only 边界
 - [ ] 失败 run 与 abstain 不删除、不重写
