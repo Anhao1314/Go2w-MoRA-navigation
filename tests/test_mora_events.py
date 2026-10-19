@@ -41,6 +41,7 @@ class EventWriterTests(unittest.TestCase):
                 self.assertLessEqual(event["event_time"], event["available_at"])
             self.assertEqual(events[1]["payload"]["reward"], 0.5)
             self.assertEqual(events[0]["payload"]["task"], "fake")
+            self.assertEqual(events[0]["payload"]["seed"], "0")
             self.assertEqual(events[0]["payload"]["planned_steps"], 10)
 
     def test_duplicate_start_rejected(self) -> None:
@@ -158,6 +159,44 @@ class Sb3CallbackTests(unittest.TestCase):
             ]
             samples = [e for e in events if e["kind"] == "sample"]
             self.assertEqual([e["payload"]["step"] for e in samples], [15, 25])
+
+    def test_callback_skips_nonfinite_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "events.jsonl"
+            writer = EventWriter(
+                path,
+                "run-nan",
+                task="fake",
+                seed=0,
+                planned_steps=10,
+            )
+            callback = Sb3EventCallback(
+                writer, sample_interval=1, manage_lifecycle=False
+            )
+            writer.start()
+            callback.num_timesteps = 1
+            callback.locals = {
+                "infos": [
+                    {
+                        "progress": float("nan"),
+                        "goal": True,
+                        "segment": 1,
+                    }
+                ],
+                "rewards": [float("nan")],
+            }
+            self.assertTrue(callback._on_step())
+            writer.finish({"status": "completed"})
+            writer.close()
+            events = [
+                json.loads(line)
+                for line in path.read_text(encoding="utf-8").splitlines()[1:]
+            ]
+            sample = next(e for e in events if e["kind"] == "sample")["payload"]
+            self.assertNotIn("reward", sample)
+            self.assertNotIn("progress", sample)
+            self.assertEqual(sample["segment"], 1.0)
+            self.assertEqual(sample["success_rate"], 1.0)
 
     def test_training_start_resets_stage_origin(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

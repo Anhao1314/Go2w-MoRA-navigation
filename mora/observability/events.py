@@ -161,10 +161,12 @@ class EventWriter:
         if self.task is not None:
             data["task"] = self.task
         if self.seed is not None:
-            data["seed"] = self.seed
+            data["seed"] = str(self.seed)
         if self.planned_steps is not None:
             data["planned_steps"] = self.planned_steps
         data.update(payload or {})
+        if "seed" in data:
+            data["seed"] = str(data["seed"])
         return self.emit(
             "start", data, event_time=event_time, available_at=available_at
         )
