@@ -81,6 +81,15 @@ python tools/win_train.py fetch mseg-full-s0
 ```
 
 ```bash
+python tools/win_train.py live mseg-full-s0 --out /tmp/mseg-live.json
+```
+
+`live` reads the Windows run directory without writing to it and returns a
+read-only snapshot: status, stage/eval progress, event-budget coverage,
+throughput and ETA. The snapshot is not evidence; the fetched run and
+`collect_run_evidence.py` manifest remain authoritative.
+
+```bash
 python tools/win_train.py stop mseg-full-s0
 ```
 

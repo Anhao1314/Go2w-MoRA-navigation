@@ -315,6 +315,20 @@ def stop_job(args: argparse.Namespace) -> None:
     ))
 
 
+def live_job(args: argparse.Namespace) -> None:
+    """Fetch a read-only live snapshot from a running job."""
+    out = ssh_run(
+        f'"{WIN_PY}" "{RUNNER}" snapshot --jobs-dir "{JOBS_DIR}" --job "{args.job}"'
+    )
+    data = json.loads(out)
+    if args.out:
+        path = pathlib.Path(args.out).expanduser()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8")
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+
+
 def fetch_job(args: argparse.Namespace) -> None:
     meta = json.loads(ssh_run(
         f'"{WIN_PY}" "{RUNNER}" status --jobs-dir "{JOBS_DIR}" --job "{args.job}"'
@@ -418,6 +432,11 @@ def main() -> None:
     p_fetch.add_argument("--run-dir", default=None,
                          help="Override the run directory; must be under rl/runs")
 
+    p_live = sub.add_parser("live")
+    p_live.add_argument("job")
+    p_live.add_argument("--out", default=None,
+                        help="Write the snapshot JSON to this path")
+
     args = parser.parse_args()
     if args.action == "sync":
         sync(force=args.force)
@@ -431,6 +450,8 @@ def main() -> None:
         stop_job(args)
     elif args.action == "fetch":
         fetch_job(args)
+    elif args.action == "live":
+        live_job(args)
 
 
 if __name__ == "__main__":

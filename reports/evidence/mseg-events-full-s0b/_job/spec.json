@@ -1,0 +1,33 @@
+{
+  "job_id": "mseg-events-full-s0b",
+  "created_at": "2026-10-19T09:10:07.092336+00:00",
+  "cwd": "D:/work/go2w",
+  "command": [
+    "D:/work/go2w/.venv/Scripts/python.exe",
+    "-u",
+    "scripts/train_multi_segment_curriculum.py",
+    "--seed",
+    "0",
+    "--device",
+    "cpu",
+    "--run-root",
+    "D:/work/go2w/rl/runs/multi_segment/mseg-events-full-s0b"
+  ],
+  "log": "D:/work/go2w/rl/runs/_jobs/mseg-events-full-s0b/train.log",
+  "env": {
+    "PYTHONUNBUFFERED": "1",
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
+    "MUJOCO_GL": "wgl",
+    "GO2W_TRAIN_DEVICE": "cpu"
+  },
+  "task": "multi-segment",
+  "seed": 0,
+  "run_dir": "D:/work/go2w/rl/runs/multi_segment/mseg-events-full-s0b",
+  "source": {
+    "commit": "c599d7ff7eecbd9d2953163d7161aad3fbab6fdc",
+    "dirty": true,
+    "dirty_files": 1,
+    "host": "yangyimingdeMacBook-Air.local"
+  }
+}
