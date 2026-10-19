@@ -29,6 +29,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import mujoco  # noqa: E402
 from mujoco_demos import common  # noqa: E402
+from mora.observability.events import EventWriter  # noqa: E402
+from mora.observability.sb3 import Sb3EventCallback  # noqa: E402
 from rl.go2w_env import MODEL_SCENARIO_PATH, Go2wEnv  # noqa: E402
 from rl.eval import save_video  # noqa: E402
 from rl.high_level_env_wrapper import HighLevelEnvWrapper  # noqa: E402
@@ -342,6 +344,12 @@ def main() -> None:
     parser.add_argument("--stage2-bc-norm", type=str,
                         default=str(PROJECT_ROOT / "data" / "demo_trajectories" / "multi_segment_stage2_bc_vecnorm.pkl"))
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--event-log", type=str, default=None,
+                        help="Event JSONL path; defaults to <run-root>/events.jsonl")
+    parser.add_argument("--no-event-log", action="store_true",
+                        help="Disable MoRA-Train event logging")
+    parser.add_argument("--event-interval", type=int, default=5_000,
+                        help="Timesteps between sample events")
     args = parser.parse_args()
 
     n_envs = 2 if args.smoke else args.envs
@@ -368,8 +376,33 @@ def main() -> None:
         requested=args.run_root,
     )
     report_dir = run_root / ("smoke_evaluation" if args.smoke else "evaluation")
+    event_writer: EventWriter | None = None
+    event_callback: Sb3EventCallback | None = None
+    if not args.no_event_log:
+        planned_steps = sum(
+            10_000 if args.smoke else int(stage["steps"]) for stage in STAGES
+        )
+        event_path = (
+            pathlib.Path(args.event_log)
+            if args.event_log
+            else run_root / "events.jsonl"
+        )
+        event_writer = EventWriter(
+            event_path,
+            run_root.name,
+            task="traverse_curve_multi_segment",
+            seed=args.seed,
+            planned_steps=planned_steps,
+        )
+        event_writer.start()
+        event_callback = Sb3EventCallback(
+            event_writer,
+            sample_interval=args.event_interval,
+            manage_lifecycle=False,
+        )
     prev_best = None
     prev_norm = None
+    stage_offset = 0
 
     for stage in STAGES:
         stage_dir = run_root / stage["name"]
@@ -424,15 +457,23 @@ def main() -> None:
             verbose=1,
         )
         callbacks: list[BaseCallback] = [cb]
+        if event_callback is not None:
+            callbacks.append(event_callback)
         if not args.smoke:
             callbacks.append(NormFreezeCallback(500_000, verbose=1))
         print(f"\n===== {stage['name']} scope={stage['scope']} steps={steps} =====")
+        if event_callback is not None:
+            event_callback.set_step_offset(stage_offset)
         model.learn(
             total_timesteps=steps,
             callback=CallbackList(callbacks),
             reset_num_timesteps=False,
             tb_log_name=f"multi_segment_{stage['name']}",
         )
+        if event_callback is not None:
+            stage_offset = event_callback.global_step
+        else:
+            stage_offset += int(model.num_timesteps)
         model.save(str(stage_dir / "final_model.zip"))
         train_env.save(str(stage_dir / "final_vec_normalize.pkl"))
         (stage_dir / ".completed").touch()
@@ -502,6 +543,13 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
+    if event_writer is not None:
+        verdict = "unknown" if args.smoke else (
+            "pass" if acc["success_rate"] >= 0.6 else "fail"
+        )
+        event_writer.finish({"status": "completed"})
+        event_writer.label({"verdict": verdict, "source": "evaluation"})
+        event_writer.close()
     try:
         if args.record and not args.smoke:
             record_demo(model, vec, report_dir / "demo")
