@@ -46,3 +46,17 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## C++ control stack dependencies
+
+The P0 `cpp/` build fetches these dependencies at configure/build time; they are
+not vendored in this repository. See each upstream project for the full license
+text.
+
+| Dependency | Version | License | Use |
+| --- | --- | --- | --- |
+| Eigen | 3.4.0 | MPL-2.0 | linear algebra |
+| OSQP | 0.6.3 | Apache-2.0 | SRBD MPC QP |
+| qdldl | bundled with OSQP | Apache-2.0 | sparse LDL factorization |
+| Catch2 | 3.7.1 | BSL-1.0 | C++ tests |
+| pybind11 | 3.x | BSD-3-Clause | Python bindings |

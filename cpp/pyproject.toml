@@ -1,0 +1,20 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.13"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "go2w-py"
+version = "0.1.0"
+description = "Go2W C++ System-0 controller bindings"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[tool.scikit-build]
+cmake.source-dir = "."
+cmake.build-type = "Release"
+wheel.packages = []
+
+[tool.scikit-build.cmake.define]
+GO2W_BUILD_PYTHON = "ON"
+GO2W_BUILD_TESTS = "OFF"
+GO2W_BUILD_BENCHMARKS = "OFF"

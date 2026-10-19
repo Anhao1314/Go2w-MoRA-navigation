@@ -234,7 +234,16 @@ def stop_viewer(task: str, seed: str,
     pid = int(rec.get("pid", 0))
     try:
         if is_alive(pid):
-            os.killpg(os.getpgid(pid), signal.SIGTERM)
+            if os.name == "nt":
+                # Windows has no process groups; terminate the viewer itself.
+                os.kill(pid, signal.SIGTERM)
+            else:
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+            # Termination is asynchronous; wait so the log handle is released
+            # before callers clean temporary directories.
+            deadline = time.time() + 2.0
+            while is_alive(pid) and time.time() < deadline:
+                time.sleep(0.05)
     except (OSError, ProcessLookupError):
         pass
     state.pop(key, None)

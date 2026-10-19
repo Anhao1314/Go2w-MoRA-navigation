@@ -1,0 +1,46 @@
+{
+  "schema_version": "navigation-integrity-v1",
+  "created_at": "2026-10-19T06:41:25.343051+00:00",
+  "config": {
+    "task": "multi-segment",
+    "method": "controller",
+    "episodes": 10,
+    "episode_seeds": [
+      1000,
+      1001,
+      1002,
+      1003,
+      1004,
+      1005,
+      1006,
+      1007,
+      1008,
+      1009
+    ],
+    "deterministic_policy": true,
+    "domain_randomize": false,
+    "scope": 2,
+    "distribution": "fixed_scene_repetition_not_generalization",
+    "controller_command": [
+      1.0,
+      0.0
+    ],
+    "junction_steering": "scripted_teacher_turn_adjust_unused",
+    "s0_backend": "cpp",
+    "pre_brake": true
+  },
+  "runtime": {
+    "python": "3.12.14",
+    "platform": "macOS-26.6-arm64-arm-64bit",
+    "packages": {
+      "numpy": "2.5.4",
+      "torch": "2.14.1",
+      "mujoco": "3.11.0",
+      "gymnasium": "1.4.0",
+      "stable-baselines3": "2.9.0"
+    },
+    "source_commit": "1cc4def45b308bbf7b6a636566bca883098305a8",
+    "source_dirty": true
+  },
+  "inputs": {}
+}

@@ -10,6 +10,7 @@ import argparse
 import copy
 import csv
 import json
+import os
 import pathlib
 import pickle
 import sys
@@ -388,6 +389,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Junction 岔路口三阶段课程学习")
     parser.add_argument("--envs", type=int, default=4)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--device",
+        choices=("auto", "cpu", "cuda", "mps"),
+        default=os.environ.get("GO2W_TRAIN_DEVICE", "cpu"),
+        help="Torch device for PPO; GO2W_TRAIN_DEVICE overrides the default",
+    )
     parser.add_argument("--run-root", type=str, default=None,
                         help="New output directory; existing directories are rejected")
     parser.add_argument("--record", action="store_true", help="Record a run-local demo")
@@ -456,12 +463,13 @@ def main() -> None:
             obs_rms.mean = np.asarray(nd["mean"], dtype=np.float32)
             obs_rms.var = np.asarray(nd["var"], dtype=np.float32)
             obs_rms.count = float(nd.get("count", 1e4))
-            model = PPO.load(args.bc_model, env=train_env, device="cpu",
+            model = PPO.load(args.bc_model, env=train_env, device=args.device,
                              learning_rate=lr, seed=args.seed)
         else:
             assert prev_best is not None and prev_norm is not None
-            model = PPO.load(str(prev_best), env=train_env, device="cpu",
+            model = PPO.load(str(prev_best), env=train_env, device=args.device,
                              learning_rate=lr, seed=args.seed)
+        print(f"PPO device: {model.device}")
         model.ent_coef = 0.005
         model.tensorboard_log = str(stage_dir / "tensorboard")
         cb = JunctionEvalCallback(
@@ -511,7 +519,7 @@ def main() -> None:
     report_dir.mkdir(parents=True, exist_ok=False)
     dummy = make_stage_env(scope=2, start_junction=False)
     vec = normalize_once(DummyVecEnv([lambda: dummy]), checkpoint=prev_norm, training=False)
-    model = PPO.load(str(prev_best), device="cpu")
+    model = PPO.load(str(prev_best), device=args.device)
     acc = final_acceptance(model, vec, episodes=eval_episodes)
     write_json_new(report_dir / "episodes.json", acc["episode_records"])
     print("最终验收:", acc)

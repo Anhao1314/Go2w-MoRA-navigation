@@ -222,7 +222,14 @@ def external_seeds() -> set[tuple[str, str]]:
 
 
 def resource_snapshot() -> dict:
-    load = os.getloadavg()
+    try:
+        load = os.getloadavg()
+    except (AttributeError, OSError):
+        # Windows has no os.getloadavg(); psutil emulates it.
+        try:
+            load = psutil.getloadavg()
+        except (AttributeError, NotImplementedError, OSError):
+            load = (0.0, 0.0, 0.0)
     try:
         cpu = psutil.cpu_percent(interval=0.3)
     except Exception:

@@ -1,0 +1,7 @@
+Test project /Users/yimingyang/Documents/Codex/2026-10-05/wo/Go2w-MoRA-navigation/build/core
+    Start 1: go2w_tests
+1/1 Test #1: go2w_tests .......................   Passed    0.08 sec
+
+100% tests passed out of 1
+
+Total Test time (real) =   0.09 sec

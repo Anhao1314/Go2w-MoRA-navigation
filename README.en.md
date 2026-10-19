@@ -1,20 +1,51 @@
-# Hierarchical Reinforcement Learning Navigation for Unitree Go2W: Methods, Experiments, and Validity Analysis
+# MoRA-Train: A Hierarchical Training System for Embodied Agents
 
-*An evidence-based engineering research report for known-path simulation tasks.*
+### First adapter: Unitree Go2W wheeled quadruped long-horizon navigation
 
-**Document type:** Open-source engineering research report (not peer-reviewed)  
-**Platform:** Unitree Go2W · MuJoCo · PPO / BC / DAgger  
-**Scope:** Bounded simulation studies; no real-robot deployment claim
+*An open, reproducible experiment bed for hierarchical embodied training.*
+
+- **Document type:** System engineering and research record (not peer-reviewed)
+- **Project:** MoRA-Train (a MoRA-inspired hierarchical embodied training system)
+- **Role of this repository:** First task adapter / experiment bed + C++ S0 control core
+- **Training side:** Windows (all Go2W training and evaluation)
+- **Quantification side:** RL-Sentinel (macOS, time-correct training reliability analysis)
+- **Scope:** Simulation only; no real-robot deployment; not a reproduction of official MoRA
 
 [中文版](README.md) · [Architecture and interfaces](docs/ARCHITECTURE.md) · [Experiments](docs/EXPERIMENTS.md) · [Reproduction](docs/USAGE.md) · [Integrity upgrade](docs/INTEGRITY_UPGRADE.md)
 
+## 0. Project positioning
+
+MoRA-Train is not primarily about making one robot dog complete one path. It asks:
+
+> How can we train an embodied agent composed of S2 planning, S1 goal-conditioned execution (multi-granularity memory + progress-aware closed loop), and S0 verifiable control, and train, evaluate, and quantify it across tasks rather than tuning for a single platform?
+
+Go2W is the **first task adapter and experiment bed** for MoRA-Train. It tests:
+
+- whether the hierarchy composes: S2 rule decisions → S1 learned policy → S0 C++ control;
+- whether S0 is numerically trustworthy: FK/IK/Jacobian, centroidal dynamics, and MPC against MuJoCo;
+- whether S1 can complete long-horizon multi-segment, junction, and goal tasks;
+- whether training can be quantified time-correctly by RL-Sentinel.
+
+| Layer | Responsibility | Current state in this repository |
+| --- | --- | --- |
+| S2 | Task decomposition, branch/skill selection | Rule-based inside the Go2W adapter |
+| S1 | Goal-conditioned policy | PPO / BC / DAgger / curriculum learning |
+| Memory | Short-term / episodic / task memory | Planned; current observations use history and stage context |
+| Progress | Progress estimation, stall detection, replanning | Planned; current task-progress metrics only |
+| S0 | Motion control, MPC, safety state machine | P0 delivered and numerically validated |
+| Observability | Event stream, as-of early-stop analysis | RL-Sentinel (separate repository) |
+
+Results in this repository therefore establish feasibility of the **first adapter**, not the whole MoRA-Train system, and not a reproduction of official MoRA.
+
 ## Abstract
 
-**Background.** Archived Go2W curve-navigation experiments with a 61-dimensional observation and six low-level PPO actions exhibited stationary behavior, limited progress, or failure. **Objective.** Investigate whether a hierarchy that reduces the learned control interface can support selected curve, multi-stage, and junction tasks under known-path simulation conditions. **Methods.** Combine System 2 rule-based goal/branch selection, System 1 PPO high-level commands, and System 0 scripted tracking and PD control; study behavior cloning (BC), DAgger, curriculum learning, and exploratory comparisons. **Results.** Under their respective archived fixed simulation protocols, the **complete systems** recorded **20/20** curve, **20/20** A→B, and **40/40** junction successes. Failed early low-level PPO, BC/DAgger attempts, and the first multi-stage version remain documented. **Conclusion.** These observations support bounded feasibility of the complete architecture, but do not isolate a causal benefit from PPO, BC, or any individual change. They do not demonstrate unseen-scene generalization or reliable hardware deployment.
+**Background.** MoRA-Train needs a reproducible embodied task to validate its hierarchical training interfaces. The Go2W wheeled quadruped provides long-horizon navigation, junction decisions, and low-level control validation in known-path simulation. **Objective.** Deliver the first adapter and test whether a rule-based S2 + learned S1 + verifiable S0 composition can complete the specified tasks. **Methods.** Combine rule-based goal/branch selection, PPO high-level commands, and scripted tracking / C++ S0 execution; record PPO, BC, DAgger, curriculum learning, and exploratory comparisons. **Results.** Under their respective archived fixed simulation protocols, curve, A→B, and junction tasks recorded **20/20**, **20/20**, and **40/40** successes; C++ S0 and scripted S0 match step by step on multi-segment, with **10/10** acceptance. **Conclusion.** These results support engineering feasibility of the first adapter, but do not isolate PPO/BC benefits, nor validate MoRA-Train's memory/progress modules, unseen-scene generalization, or real-robot reliability.
 
-**Keywords:** hierarchical control; robot navigation; reinforcement learning; PPO; imitation learning; MuJoCo; reproducibility
+**Keywords:** MoRA-inspired; hierarchical embodied agents; robot navigation; reinforcement learning; PPO; MuJoCo; training reliability
 
-## 1. Introduction and research questions
+## 1. First adapter: research questions
+
+These RQs are at the **Go2W adapter level**, not the full set of MoRA-Train research questions; system-level memory, progress-loop, and cross-task questions are addressed in later iterations.
 
 Curved and multi-stage navigation couples stability, path following, speed regulation, and arrival/stop constraints. Learning all of these directly as low-level actions may produce stationary or ineffective policies. The initial recorded formulation used **61-dimensional observations and six-dimensional actions**, with unsuccessful curve-navigation attempts ([archived experiments](docs/EXPERIMENTS.md)).
 
@@ -28,7 +59,9 @@ The study asks:
 
 **Scope and naming:** “MoRA-inspired” means an independent engineering interpretation of layered control, **not an official MoRA model or training reproduction**. System 2 currently consists of deterministic rules, not learned VLM/VLA planning or open-world semantic navigation. No real Go2W deployment was evaluated.
 
-## 2. Methods
+## 2. Go2W adapter methods
+
+The methods below are specific to the Go2W adapter, not the complete design of the general MoRA-Train system; the system-level task API, memory, and progress modules are abstracted in later iterations.
 
 ### 2.1 Simulation environment and tasks
 
@@ -86,7 +119,7 @@ Archived metrics include task success, reported progress/distance, elapsed time,
 Varying evaluation episode seeds, independently retraining with new random seeds, and testing novel scenes are distinct levels of validation. Most positive archived claims establish only the first.
 
 <a id="final-results"></a>
-## 3. Archived experimental results
+## 3. Go2W adapter archived results
 
 | Experiment | Recorded result | Interpretation | Evidence |
 | --- | --- | --- | --- |
@@ -134,6 +167,7 @@ A B+ historical report mentions HER in prose although its configuration states *
 4. **Measurement validity:** Progress metrics may not represent actual traveled path length; A docking and B arrival have different criteria.
 5. **Reproducibility:** Final successful PPO checkpoints, matching normalization statistics, and complete training logs are not contained in the public snapshot. Committed code, selected data, videos, and reports are **not a byte-for-byte trained-policy replay** without retraining.
 6. **Capability boundary:** Route choices, teacher steering, and portions of braking are scripted; no learned System 2, open-world vision navigation, or certified real-robot safety is established.
+7. **System-level boundary:** This repository is the first adapter of MoRA-Train; multi-granularity memory, progress-aware closed loops, and cross-task adapters are not implemented yet, so these results are not evidence for the whole training system.
 
 ## 6. Reproduction and experiment integrity
 
@@ -174,9 +208,38 @@ Older scripts can overwrite named historical artifacts. Use an isolated checkout
 
 ## 7. Conclusion and future experiments
 
-This repository documents a bounded hierarchical-navigation engineering study: initial low-level PPO failures, a revised division of control responsibilities, and archived success and failure experiments on specified simulated tasks. Its value lies in **inspectable system design and evidence-based failure analysis**, not a newly invented RL algorithm or proven hardware generalization.
+This repository currently delivers the **first adapter** of MoRA-Train: an inspectable Go2W hierarchical-navigation experiment bed plus an independently testable C++ S0 control core. Its value lies in **hierarchy interfaces, control/learning division, experiment diagnosis, and reproducible records**, not a new RL algorithm or validation of the whole MoRA-Train system.
 
-Next work should prioritize matched multi-training-seed comparisons against controller-only baselines, held-out tasks and domain randomization, isolated BC/docking ablations, publication of policy-normalization-checkpoint pairs with exact manifests, and only then studies of perception, latency, safety, and real-robot deployment.
+Next work proceeds at the system level:
+
+1. implement a task-adapter API outside Go2W (`reset / step / goal / progress / success`);
+2. add short-term/episodic memory and a progress head to S1, with memory/progress ablations;
+3. connect the training event stream to RL-Sentinel for cross-task, multi-seed early-stop reliability;
+4. add multi-seed, domain-randomization, single-factor ablations, and matched checkpoint/normalization manifests;
+5. complete the ROS2 P1 vertical slice before discussing real-robot boundaries.
+
+## 8. S0 component: C++ / ROS2 stack (P0)
+
+Within MoRA-Train, this section is the **S0 component plus control-layer validation for the first adapter**, not the whole training system. A **ROS-agnostic C++17 control core** now sits beneath the existing Python/MuJoCo stack as an independently testable System 0. P0 delivers the C++ core plus a Python adapter; the ROS2 vertical slice (P1) is not implemented yet.
+
+- Floating-base FK/IK and wheel Jacobians (1e-9 / 1e-6 vs MuJoCo fixtures)
+- Centroidal mass/COM/inertia (1e-9 / 1e-8)
+- SRBD linear MPC (OSQP, N=20, 50 Hz)
+- Contact-force → wheel-torque mapping and a safety state machine
+- Scripted teacher with optional A/B pre-braking
+- pybind11 injection into the existing `HighLevelEnvWrapper`
+
+**P0 evidence (fixed seeds 1000–1009):**
+
+| Configuration | Success | mean_x | mean_time |
+| --- | ---: | ---: | ---: |
+| scripted, no pre-brake (historical baseline) | 0/10 | 4.7811 | 6.292 s |
+| scripted, pre-brake | 10/10 | 10.6571 | 13.990 s |
+| **C++ S0, pre-brake** | **10/10** | **10.6571** | **13.990 s** |
+
+The C++ and scripted pre-brake runs match item by item, and the seed-1000 trajectory is identical step by step. MPC benchmark: 200/200 solves, mean 3.16 ms, p99 4.07 ms, hover vertical-force error 2.15%. Demo video: [cpp_stack_p0_demo.mp4](media/cpp_stack_p0_demo.mp4). Native Windows (MSVC 2026) validation: Python suite **225 tests OK (4 skipped)**, bindings 3/3, MPC 200/200 (mean 3.88 ms, p99 4.59 ms), multi-segment **10/10** (mean_x 10.6563, 14.000 s). See [Windows validation](docs/WINDOWS_NATIVE.md).
+
+**Scope limits:** simulation only; no ROS2 nodes, EKF, full WBC/RNEA, vision/tactile, real robot, or sim-to-real; MPC is not yet closed-loop integrated with `Go2wEnv`; historical success rates are not retroactively claimed. See [C++ architecture](docs/CPP_ROS2_ARCHITECTURE.md) · [Control design](docs/CONTROL_DESIGN.md) · [Calibration](docs/CALIBRATION.md) · [Validation](docs/VALIDATION.md) · [P0 protocol](docs/CPP_STACK_PROTOCOL.md) · [cpp/README](cpp/README.md).
 
 ## References
 

@@ -1,0 +1,102 @@
+[
+  {
+    "seed": 1000,
+    "success": true,
+    "max_progress": 10.656275411301248,
+    "steps": 1400,
+    "time_seconds": 14.000000000001345,
+    "terminated": false,
+    "truncated": true,
+    "a_stop": true
+  },
+  {
+    "seed": 1001,
+    "success": true,
+    "max_progress": 10.656275411301248,
+    "steps": 1400,
+    "time_seconds": 14.000000000001345,
+    "terminated": false,
+    "truncated": true,
+    "a_stop": true
+  },
+  {
+    "seed": 1002,
+    "success": true,
+    "max_progress": 10.656275411301248,
+    "steps": 1400,
+    "time_seconds": 14.000000000001345,
+    "terminated": false,
+    "truncated": true,
+    "a_stop": true
+  },
+  {
+    "seed": 1003,
+    "success": true,
+    "max_progress": 10.656275411301248,
+    "steps": 1400,
+    "time_seconds": 14.000000000001345,
+    "terminated": false,
+    "truncated": true,
+    "a_stop": true
+  },
+  {
+    "seed": 1004,
+    "success": true,
+    "max_progress": 10.656275411301248,
+    "steps": 1400,
+    "time_seconds": 14.000000000001345,
+    "terminated": false,
+    "truncated": true,
+    "a_stop": true
+  },
+  {
+    "seed": 1005,
+    "success": true,
+    "max_progress": 10.656275411301248,
+    "steps": 1400,
+    "time_seconds": 14.000000000001345,
+    "terminated": false,
+    "truncated": true,
+    "a_stop": true
+  },
+  {
+    "seed": 1006,
+    "success": true,
+    "max_progress": 10.656275411301248,
+    "steps": 1400,
+    "time_seconds": 14.000000000001345,
+    "terminated": false,
+    "truncated": true,
+    "a_stop": true
+  },
+  {
+    "seed": 1007,
+    "success": true,
+    "max_progress": 10.656275411301248,
+    "steps": 1400,
+    "time_seconds": 14.000000000001345,
+    "terminated": false,
+    "truncated": true,
+    "a_stop": true
+  },
+  {
+    "seed": 1008,
+    "success": true,
+    "max_progress": 10.656275411301248,
+    "steps": 1400,
+    "time_seconds": 14.000000000001345,
+    "terminated": false,
+    "truncated": true,
+    "a_stop": true
+  },
+  {
+    "seed": 1009,
+    "success": true,
+    "max_progress": 10.656275411301248,
+    "steps": 1400,
+    "time_seconds": 14.000000000001345,
+    "terminated": false,
+    "truncated": true,
+    "a_stop": true
+  }
+]

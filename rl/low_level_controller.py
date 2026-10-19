@@ -79,9 +79,13 @@ class LowLevelController:
 class MultiSegmentLowLevelController(LowLevelController):
     """多段路径 System 0：教师 bias 按当前段计算。"""
 
-    def __init__(self, segments: list, **kwargs):
+    def __init__(self, segments: list, pre_brake: bool = False, **kwargs):
         super().__init__(**kwargs)
         self._segments = segments
+        # Pre-braking near the subgoal is the behavior used by the archived
+        # multi-segment scripted validation (20/20). It is opt-in so existing
+        # training/evaluation protocols keep their historical behavior.
+        self.pre_brake = bool(pre_brake)
 
     def compute_action(
         self,
@@ -97,6 +101,11 @@ class MultiSegmentLowLevelController(LowLevelController):
         dist = cmd.get("dist_to_subgoal")
         speed = cmd.get("speed")
         seg = self._segments[seg_idx]
+        if self.pre_brake and dist is not None:
+            if dist < 0.3:
+                speed_scale = min(speed_scale, 0.4)
+            elif dist < 0.8:
+                speed_scale = min(speed_scale, 0.3 + (dist - 0.3) / 0.5 * 0.7)
         if dist is not None and speed is not None:
             if dist <= seg["goal_tolerance"]:
                 if abs(speed) < seg["stop_speed_threshold"]:

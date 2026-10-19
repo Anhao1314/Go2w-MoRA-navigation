@@ -1,7 +1,7 @@
-# 中文研究报告
+# 中文主文档
 
-本仓库的中文主文档已改为论文式工程研究报告，旧链接保留作为兼容入口。
+本仓库是 **MoRA-Train** 的第一个 task adapter 和实验床：Unitree Go2W 轮式四足的分层导航与 S0 C++ 控制验证。
 
-**[阅读完整中文研究报告：已知路径条件下的 Unitree Go2W 分层强化学习导航](README.md)**
+**[阅读完整中文文档：MoRA-Train 第一个 adapter —— Go2W 分层导航](README.md)**
 
-英文版见 [README.en.md](README.en.md)；具体技术实现、实验结果及适用范围以研究报告和其链接的原始代码/实验记录为准。
+英文版见 [README.en.md](README.en.md)；MoRA-Train 的系统定位、Go2W adapter 的边界，以及具体技术实现和实验证据以主文档及其链接的原始记录为准。

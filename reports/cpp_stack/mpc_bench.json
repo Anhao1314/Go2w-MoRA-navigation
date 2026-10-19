@@ -1,0 +1,12 @@
+{
+  "iterations": 200,
+  "solved": 200,
+  "mean_ms": 3.161866,
+  "p50_ms": 3.117875,
+  "p95_ms": 3.303791,
+  "p99_ms": 4.073791,
+  "max_ms": 5.037166,
+  "horizontal_hover_vertical_force_n": 183.587062,
+  "weight_n": 187.630062,
+  "vertical_force_error_pct": 2.154772
+}

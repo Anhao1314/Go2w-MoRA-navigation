@@ -9,7 +9,7 @@ import argparse
 import json
 import pathlib
 import sys
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from stable_baselines3 import PPO
@@ -43,6 +43,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task", choices=("multi-segment", "junction"), required=True)
     parser.add_argument("--method", choices=("controller", "ppo"), required=True)
+    parser.add_argument(
+        "--s0", choices=("scripted", "cpp"), default="scripted",
+        help="System-0 backend; cpp is only supported for multi-segment",
+    )
+    parser.add_argument(
+        "--pre-brake", action="store_true",
+        help="Enable subgoal pre-braking (archived scripted validation behavior)",
+    )
     parser.add_argument("--checkpoint", help="Trusted PPO model zip; never auto-downloaded")
     parser.add_argument("--normalization", help="Matching trusted VecNormalize pickle")
     parser.add_argument("--episodes", type=int, default=20)
@@ -55,6 +63,8 @@ def main() -> None:
         parser.error(str(exc))
     if args.task == "junction" and args.episodes % 2:
         parser.error("junction requires an even episode count for balanced A/B targets")
+    if args.task == "junction" and args.s0 == "cpp":
+        parser.error("junction bypasses the System-0 controller; use --s0 scripted")
     inputs: dict[str, str] = {}
     if args.method == "ppo":
         if not args.checkpoint or not args.normalization:
@@ -69,14 +79,23 @@ def main() -> None:
         "distribution": "fixed_scene_repetition_not_generalization",
         "controller_command": [1.0, 0.0] if args.method == "controller" else None,
         "junction_steering": "scripted_teacher_turn_adjust_unused",
+        "s0_backend": args.s0,
+        "pre_brake": bool(args.pre_brake),
     }
     output = start_run(PROJECT_ROOT, "navigation_evaluation", config, inputs, args.output)
-    suite = junction if args.task == "junction" else multi_segment
     vec = None
     try:
         if args.method == "ppo":
             # Both factories accept (scope, start_at_intermediate_goal).
-            raw = DummyVecEnv([lambda: suite.make_stage_env(2, False)])
+            if args.task == "multi-segment":
+                raw = DummyVecEnv(
+                    [lambda: cast(Any, multi_segment.make_stage_env(
+                        2, False, s0=args.s0, pre_brake=args.pre_brake))]
+                )
+            else:
+                raw = DummyVecEnv(
+                    [lambda: cast(Any, junction.make_stage_env(2, False))]
+                )
             try:
                 vec = normalize_once(raw, checkpoint=args.normalization, training=False)
             except Exception:
@@ -87,9 +106,17 @@ def main() -> None:
         else:
             policy = ControllerPolicy()
             normalizer = IdentityNormalization()
-        result = suite.final_acceptance(
-            policy, normalizer, episodes=args.episodes, seed_start=args.seed_start,
-        )
+        if args.task == "multi-segment":
+            result = multi_segment.final_acceptance(
+                policy, normalizer, episodes=args.episodes,
+                seed_start=args.seed_start, s0=args.s0,
+                pre_brake=args.pre_brake,
+            )
+        else:
+            result = junction.final_acceptance(
+                policy, normalizer, episodes=args.episodes,
+                seed_start=args.seed_start,
+            )
         records = result.pop("episode_records")
         write_json_new(output / "episodes.json", records)
         write_json_new(output / "summary.json", {

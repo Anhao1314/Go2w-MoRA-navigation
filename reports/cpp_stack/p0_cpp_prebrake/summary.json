@@ -1,0 +1,47 @@
+{
+  "schema_version": "navigation-integrity-v1",
+  "status": "complete",
+  "config": {
+    "task": "multi-segment",
+    "method": "controller",
+    "episodes": 10,
+    "episode_seeds": [
+      1000,
+      1001,
+      1002,
+      1003,
+      1004,
+      1005,
+      1006,
+      1007,
+      1008,
+      1009
+    ],
+    "deterministic_policy": true,
+    "domain_randomize": false,
+    "scope": 2,
+    "distribution": "fixed_scene_repetition_not_generalization",
+    "controller_command": [
+      1.0,
+      0.0
+    ],
+    "junction_steering": "scripted_teacher_turn_adjust_unused",
+    "s0_backend": "cpp",
+    "pre_brake": true
+  },
+  "metrics": {
+    "success_rate": 1.0,
+    "a_stop_rate": 1.0,
+    "mean_x": 10.657137861269847,
+    "mean_ep_len": 1399.0,
+    "mean_time": 13.990000000001341,
+    "failed_terminations": 0,
+    "episodes": 10
+  },
+  "limitations": [
+    "Fixed scenes; disjoint episode seeds are not independent training seeds.",
+    "No scene/domain-shift generalization claim.",
+    "Non-success terminations include more than falls.",
+    "max_progress follows the environment metric, not traveled path length."
+  ]
+}

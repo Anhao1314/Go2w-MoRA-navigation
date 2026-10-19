@@ -28,3 +28,76 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Type check
         run: pyright rl scripts mujoco_demos
+
+  cpp-build-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build git
+      - name: Configure
+        run: >
+          cmake -S cpp -B build/core -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DGO2W_BUILD_TESTS=ON
+          -DGO2W_BUILD_BENCHMARKS=ON
+      - name: Build
+        run: cmake --build build/core
+      - name: Test
+        run: ctest --test-dir build/core --output-on-failure
+      - name: MPC benchmark
+        run: ./build/core/go2w_mpc_bench
+
+  cpp-macos:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -S cpp -B build/core
+          -DCMAKE_BUILD_TYPE=Release
+          -DGO2W_BUILD_TESTS=ON
+          -DGO2W_BUILD_BENCHMARKS=ON
+      - name: Build
+        run: cmake --build build/core -j 4
+      - name: Test
+        run: ctest --test-dir build/core --output-on-failure
+
+  python-binding:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      MUJOCO_GL: egl
+      PYOPENGL_PLATFORM: egl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libgl1-mesa-dri \
+            build-essential cmake ninja-build
+          python -m pip install -r requirements-dev.txt pybind11
+      - name: Build C++ core and Python bindings
+        run: |
+          cmake -S cpp -B build/py -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGO2W_BUILD_PYTHON=ON \
+            -DGO2W_BUILD_TESTS=OFF \
+            -DGO2W_BUILD_BENCHMARKS=OFF \
+            -Dpybind11_DIR="$(python -m pybind11 --cmakedir)"
+          cmake --build build/py
+      - name: Binding and integration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/build/py
+        run: python -m unittest discover -s tests -p 'test_cpp_binding.py' -v
