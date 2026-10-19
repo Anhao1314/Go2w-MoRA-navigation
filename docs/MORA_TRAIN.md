@@ -20,7 +20,7 @@
 | SB3 observer | ✅ 已实现 | `Sb3EventCallback` 周期性写 sample；课程阶段用全局 step offset 保持单调 |
 | Go2W adapter | ✅ 已实现 | multi-segment / junction / high-level-curve |
 | 训练脚本接入 | 🟡 multi-segment 已接入 | `train_multi_segment_curriculum.py` 默认写 `<run-root>/events.jsonl`；junction/high-level-curve 待接 |
-| RL-Sentinel ingester | ⏳ 下一步 | Mac 侧尚未消费 Go2W 的事件扩展字段 |
+| RL-Sentinel ingester | ✅ 已接入 | strict v0.2 import/replay 已接受 `progress/success_rate/segment`；真实 smoke 已验证（RL-Sentinel PR #4） |
 
 测试：`249 tests OK (1 skipped)`（2026-10-19，macOS），`mora` 通过 Pyright。
 
@@ -111,7 +111,7 @@ runtime.close()
 - observer 会跳过非有限遥测值，避免 NaN 中断训练；`EventWriter` 本身仍拒绝 NaN
 - `Sb3EventCallback` 只写 `start/sample/finish`；最终 `pass/fail` 由验收评估追加
 
-当前 sample 扩展字段包括 `progress`、`success_rate`、`segment`。RL-Sentinel 的 Go2W ingester 需要显式接受这些字段，而不是把它们当作旧 schema 的未知字段。
+当前 sample 扩展字段包括 `progress`、`success_rate`、`segment`。RL-Sentinel 已显式接受这些字段（PR #4），并校验 `success_rate ∈ [0,1]`、`segment ≥ 0`、`progress` 有限；它们仍受同一时间与白名单校验。
 
 `planned_steps` 是计划预算，不是硬上界。SB3/PPO 可能按 rollout 边界少量超跑；例如 smoke 计划 30k，实际记录到 35k。消费者必须使用实际 `sample.step`，不能因为超过计划预算就拒绝一条 run。
 
@@ -122,12 +122,12 @@ runtime.close()
 - 当前 Go2W 环境仍由 `HighLevelEnvWrapper` 提供观测和任务进度。
 - `Go2wTaskAdapter` 复用 `make_stage_env` / `make_high_level_env`，保证 reward、termination、观测语义与 P0 一致。
 - C++ S0 目前只接到 multi-segment 的 `s0="cpp"`；junction/high-level-curve 仍用 scripted S0。
-- 训练脚本尚未默认使用 `AgentRuntime`；下一步是给训练脚本加 `--event-log` / observer，并在评估后写 `label`。
+- 训练脚本仍以原生 PPO 入口为主；multi-segment 已接入事件 observer 和 `label`，`AgentRuntime` 尚未替换训练入口。
 
 ## 7. 下一步
 
 1. 把 `Sb3EventCallback` 接到 junction、high-level-curve、curve 三个入口；multi-segment 已完成。
-2. 在 RL-Sentinel 增加 Go2W ingester，接受 `progress/success_rate/segment` 扩展字段。
+2. 用全量 Go2W run 做跨任务/多 seed 的 as-of 分析；ingester 扩展已完成。
 3. 用 `AgentRuntime` 跑一条完整 multi-segment episode，对比 scripted 路径的 success/progress。
 4. 加一个学习型 progress head 和一个记忆消融实验。
 5. 再考虑 ROS2/S0 500 Hz 节点。
