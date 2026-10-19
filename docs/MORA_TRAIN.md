@@ -21,8 +21,10 @@
 | Go2W adapter | ✅ 已实现 | multi-segment / junction / high-level-curve |
 | 训练脚本接入 | 🟡 multi-segment 已接入 | `train_multi_segment_curriculum.py` 默认写 `<run-root>/events.jsonl`；junction/high-level-curve 待接 |
 | RL-Sentinel ingester | ✅ 已接入 | strict v0.2 import/replay 已接受 `progress/success_rate/segment`；真实 smoke 已验证（RL-Sentinel PR #4） |
+| Live snapshot | ✅ 已实现 | `win_job_runner.py snapshot` + `win_train.py live`；只读，不写 run |
+| Observed matrix | ✅ 已完成 | 18 条 multi-segment（6 pass / 12 fail）；readiness `candidate_for_external_validation`；证据 `reports/evidence/matrix-2026-10-19/` |
 
-测试：`249 tests OK (1 skipped)`（2026-10-19，macOS），`mora` 通过 Pyright。
+测试：`258 tests OK (1 skipped)`（2026-10-19，macOS），`mora` 通过 Pyright。
 
 ## 2. 运行时循环
 
@@ -127,7 +129,7 @@ runtime.close()
 ## 7. 下一步
 
 1. 把 `Sb3EventCallback` 接到 junction、high-level-curve、curve 三个入口；multi-segment 已完成。
-2. 用全量 Go2W run 做跨任务/多 seed 的 as-of 分析；ingester 扩展已完成。
+2. 18 条 multi-segment observed 矩阵已完成（6 pass / 12 fail，readiness `candidate_for_external_validation`）；下一步是跨任务 cohort 和自然失败模式。
 3. 用 `AgentRuntime` 跑一条完整 multi-segment episode，对比 scripted 路径的 success/progress。
 4. 加一个学习型 progress head 和一个记忆消融实验。
 5. 再考虑 ROS2/S0 500 Hz 节点。

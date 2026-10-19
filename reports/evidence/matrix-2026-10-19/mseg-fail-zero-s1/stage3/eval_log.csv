@@ -1,0 +1,2 @@
+timesteps,mean_reward,mean_ep_len,mean_x,success_rate,passed_rate
+82768,125.845,754.0,4.8628,0.0,1.0

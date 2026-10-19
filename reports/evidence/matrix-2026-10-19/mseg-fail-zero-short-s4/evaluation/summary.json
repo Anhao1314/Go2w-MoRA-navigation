@@ -1,0 +1,41 @@
+{
+  "task": "traverse_curve_multi_segment",
+  "seed": 4,
+  "schema_version": "navigation-integrity-v1",
+  "episodes": 20,
+  "acceptance_seeds": [
+    1000,
+    1001,
+    1002,
+    1003,
+    1004,
+    1005,
+    1006,
+    1007,
+    1008,
+    1009,
+    1010,
+    1011,
+    1012,
+    1013,
+    1014,
+    1015,
+    1016,
+    1017,
+    1018,
+    1019
+  ],
+  "checkpoint": {
+    "path": "D:\\work\\go2w\\rl\\runs\\multi_segment\\mseg-fail-zero-short-s4\\stage3\\final_model.zip",
+    "bytes": 2046792,
+    "sha256": "1bf9e582296b60b919d5de3d95c2780221e34f6317535da7fe54a2d3624df1cd"
+  },
+  "normalization": {
+    "path": "D:\\work\\go2w\\rl\\runs\\multi_segment\\mseg-fail-zero-short-s4\\stage3\\final_vec_normalize.pkl",
+    "bytes": 4090,
+    "sha256": "65e67a128c49d7e7d1b6a78cdec0c4ae0004044fcff5e951ead59dc6e4cca151"
+  },
+  "verdict": "fail",
+  "success_rate": 0.0,
+  "distance": 0.0
+}

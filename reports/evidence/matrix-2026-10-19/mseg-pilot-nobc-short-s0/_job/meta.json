@@ -1,0 +1,33 @@
+{
+  "job_id": "mseg-pilot-nobc-short-s0",
+  "status": "finished",
+  "launcher_pid": 8596,
+  "created_at": "2026-10-19T12:03:59.459888+00:00",
+  "spec": "D:\\work\\go2w\\rl\\runs\\_jobs\\mseg-pilot-nobc-short-s0\\spec.json",
+  "log": "D:\\work\\go2w\\rl\\runs\\_jobs\\mseg-pilot-nobc-short-s0\\train.log",
+  "cwd": "D:/work/go2w",
+  "command": [
+    "D:/work/go2w/.venv/Scripts/python.exe",
+    "-u",
+    "scripts/train_multi_segment_curriculum.py",
+    "--seed",
+    "0",
+    "--device",
+    "cpu",
+    "--run-root",
+    "D:/work/go2w/rl/runs/multi_segment/mseg-pilot-nobc-short-s0",
+    "--no-bc",
+    "--budget-scale",
+    "0.05"
+  ],
+  "run_dir": "D:/work/go2w/rl/runs/multi_segment/mseg-pilot-nobc-short-s0",
+  "task": "multi-segment",
+  "seed": 0,
+  "host": "PC-20260908KTAB",
+  "pid": 14380,
+  "started_at": "2026-10-19T12:03:59.514410+00:00",
+  "device": "cpu",
+  "child_pid": 27432,
+  "exit_code": 0,
+  "finished_at": "2026-10-19T12:10:57.716180+00:00"
+}
