@@ -27,7 +27,7 @@ jobs:
       - name: Unit and regression tests
         run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Type check
-        run: pyright rl scripts mujoco_demos
+        run: pyright rl scripts mujoco_demos mora
 
   cpp-build-test:
     runs-on: ubuntu-24.04
