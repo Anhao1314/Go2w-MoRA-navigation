@@ -6,7 +6,7 @@
 
 **研究对象：**
 - 墨奇智能（MORPHI）MoRA（MORPHI Reasoning & Autonomy）具身智能架构
-- 本仓库 `Go2w-MoRA-navigation` 的 "MoRA-inspired" 分层实现
+- 本仓库 `go2w-locomotion` 的 "MoRA-inspired" 分层实现
 
 **一句话结论：** 本仓库目前借鉴的是 MoRA 的**三层职责划分**（规则决策 / 学习型导航策略 / 脚本运动控制），但没有实现 MoRA 真正的核心——**把目标持续性、多粒度记忆和进度认知内化到 System 1 策略内部**。仓库的 "记忆" 实际是环境侧手写状态机，"目标条件" 是少量数值特征拼接，"进度" 是环境计算的奖励塑形项。要推进到 MoRA-inspired v2，应优先做三件事：**内化记忆、加进度头、把外部状态从观测里拿掉并做消融**。
 

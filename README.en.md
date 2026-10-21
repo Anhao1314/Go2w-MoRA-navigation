@@ -174,8 +174,8 @@ A B+ historical report mentions HER in prose although its configuration states *
 Python 3.10 or 3.12 is recommended on **Linux or WSL2's Linux filesystem**. Third-party model assets have case-colliding filenames; common case-insensitive Windows/macOS filesystems cannot faithfully represent all of them. See the [full setup guide](docs/USAGE.md).
 
 ```bash
-git clone https://github.com/Anhao1314/Go2w-MoRA-navigation.git
-cd Go2w-MoRA-navigation
+git clone https://github.com/Anhao1314/go2w-locomotion.git
+cd go2w-locomotion
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
@@ -281,4 +281,4 @@ runtime.close()
 
 ## Contributions and licensing
 
-**Anhao1314:** Project owner; original robotics/RL system, experiments, and archived evidence. **Claude-Anhao (Claude):** AI collaboration on the MoRA-Train system layer, C++/Python integration, Windows training orchestration, event streams, and documentation; this credit does not imply an independent human author or peer review. **ChatGPT (OpenAI):** AI collaboration on repository review, the [experiment-integrity refactor](https://github.com/Anhao1314/Go2w-MoRA-navigation/pull/1), validation design, and documentation; this credit does not imply an independent human author or peer review. Original code is [MIT licensed](LICENSE); Go2W assets and other third-party materials retain their own [model license](models/go2w/LICENSE) and [third-party notices](docs/THIRD_PARTY_NOTICES.md).
+**Anhao1314:** Project owner; original robotics/RL system, experiments, and archived evidence. **Claude-Anhao (Claude):** AI collaboration on the MoRA-Train system layer, C++/Python integration, Windows training orchestration, event streams, and documentation; this credit does not imply an independent human author or peer review. **ChatGPT (OpenAI):** AI collaboration on repository review, the [experiment-integrity refactor](https://github.com/Anhao1314/go2w-locomotion/pull/1), validation design, and documentation; this credit does not imply an independent human author or peer review. Original code is [MIT licensed](LICENSE); Go2W assets and other third-party materials retain their own [model license](models/go2w/LICENSE) and [third-party notices](docs/THIRD_PARTY_NOTICES.md).

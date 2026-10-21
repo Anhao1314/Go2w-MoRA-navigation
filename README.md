@@ -173,8 +173,8 @@ B+ 历史报告的配置显示 HER 关闭，但文本结论出现过 HER 有效�
 推荐 Python 3.10 或 3.12，在 **Linux / WSL2 的 Linux 文件系统**中运行。仓库第三方 Go2W 资产存在只在大小写上不同的文件名，常见 macOS/Windows 文件系统可能无法完整检出。具体要求见[使用指南](docs/USAGE.md)。
 
 ```bash
-git clone https://github.com/Anhao1314/Go2w-MoRA-navigation.git
-cd Go2w-MoRA-navigation
+git clone https://github.com/Anhao1314/go2w-locomotion.git
+cd go2w-locomotion
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
@@ -295,4 +295,4 @@ runtime.close()
 
 ## 贡献与许可
 
-**Anhao1314：** 项目负责人，原始系统、机器人/RL 实现、实验与归档证据。**Claude-Anhao（Claude）：** AI 协作参与 MoRA-Train 系统层、C++/Python 集成、Windows 训练编排、事件流与文档维护；该署名不代表独立人类作者或同行评议。**ChatGPT（OpenAI）：** AI 协作参与仓库审查、[实验完整性重构](https://github.com/Anhao1314/Go2w-MoRA-navigation/pull/1)、验证设计与文档维护；该署名不代表独立人类作者或同行评议。自研代码使用 [MIT](LICENSE)，Go2W 资产与第三方内容见[模型许可](models/go2w/LICENSE)及[第三方声明](docs/THIRD_PARTY_NOTICES.md)。
+**Anhao1314：** 项目负责人，原始系统、机器人/RL 实现、实验与归档证据。**Claude-Anhao（Claude）：** AI 协作参与 MoRA-Train 系统层、C++/Python 集成、Windows 训练编排、事件流与文档维护；该署名不代表独立人类作者或同行评议。**ChatGPT（OpenAI）：** AI 协作参与仓库审查、[实验完整性重构](https://github.com/Anhao1314/go2w-locomotion/pull/1)、验证设计与文档维护；该署名不代表独立人类作者或同行评议。自研代码使用 [MIT](LICENSE)，Go2W 资产与第三方内容见[模型许可](models/go2w/LICENSE)及[第三方声明](docs/THIRD_PARTY_NOTICES.md)。
