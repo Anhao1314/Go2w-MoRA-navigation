@@ -19,7 +19,7 @@
 | ID | 任务 | 状态 | 备注 |
 | --- | --- | --- | --- |
 | W1.0 | 计划、记录规范、ADR 骨架 | ✅ | [PLAN.md](PLAN.md)、[decisions/](decisions/) |
-| W1.1 | S1 三种子训练（seed 0/1/2） | 🔄 训练中 | 1500 iters × 2048 envs，约 43 min/seed |
+| W1.1 | S1 三种子训练（seed 0/1/2） | 🔄 训练中（141/1500，seed 0） | 评估脚本 `scripts/eval_policy.py` 已就绪（编译通过，待训练结束后运行验证） |
 | W1.2 | Go2 模型参数导出 | ✅ | `locomotion/guardrail/go2_model.json`（19 bodies / 12 joints / 14.971 kg / SHA-256 `12b78af4`） |
 | W1.3 | C++ 浮基 FK + CoM + 支撑多边形 | ⏳ | `cpp/guardrail/` |
 | W1.4 | 数值对比报告 | ⏳ | 与 Isaac 的 FK/CoM 对比 |
