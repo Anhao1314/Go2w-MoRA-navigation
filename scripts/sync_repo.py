@@ -27,6 +27,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import time
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEFAULT_LOG = PROJECT_ROOT / "logs" / "autosync.log"
@@ -78,6 +79,43 @@ def is_dirty(git: str) -> bool:
     return bool(run_git(git, "status", "--porcelain").stdout.strip())
 
 
+def operation_in_progress(git: str) -> str | None:
+    """Return the name of an in-flight git operation, if any.
+
+    A scheduled pull must never interleave with a rebase/merge/cherry-pick
+    the user is driving by hand.
+    """
+    git_dir = pathlib.Path(run_git(git, "rev-parse", "--git-dir").stdout.strip())
+    if not git_dir.is_absolute():
+        git_dir = PROJECT_ROOT / git_dir
+    for marker in (
+        "MERGE_HEAD",
+        "REBASE_HEAD",
+        "rebase-merge",
+        "rebase-apply",
+        "CHERRY_PICK_HEAD",
+        "BISECT_LOG",
+    ):
+        if (git_dir / marker).exists():
+            return marker
+    return None
+
+
+def fetch_with_retry(git: str, attempts: int = 2, delay_s: float = 2.0) -> None:
+    """Fetch origin, retrying once: home networks drop TLS connections."""
+    last_error: GitError | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            run_git(git, "fetch", "--prune", REMOTE)
+            return
+        except GitError as exc:
+            last_error = exc
+            if attempt < attempts:
+                time.sleep(delay_s)
+    assert last_error is not None
+    raise last_error
+
+
 def counts(git: str, local_ref: str, remote_ref: str) -> tuple[int, int]:
     """Return ``(ahead, behind)`` for ``local_ref...remote_ref``."""
     out = run_git(git, "rev-list", "--left-right", "--count", f"{local_ref}...{remote_ref}").stdout
@@ -126,6 +164,11 @@ def sync(status_only: bool, prune: bool, push: bool = False) -> tuple[bool, list
     notes: list[str] = []
     git = find_git()
 
+    in_progress = operation_in_progress(git)
+    if in_progress:
+        notes.append(f"skipped: git operation in progress ({in_progress})")
+        return False, notes
+
     branch = current_branch(git)
     if branch != SYNC_BRANCH:
         notes.append(f"pull skipped: current branch is '{branch}', not '{SYNC_BRANCH}'")
@@ -139,7 +182,7 @@ def sync(status_only: bool, prune: bool, push: bool = False) -> tuple[bool, list
             notes.extend(push_current_branch(git))
         return False, notes
 
-    run_git(git, "fetch", "--prune", REMOTE)
+    fetch_with_retry(git)
     ahead, behind = counts(git, SYNC_BRANCH, f"{REMOTE}/{SYNC_BRANCH}")
 
     if ahead and behind:
