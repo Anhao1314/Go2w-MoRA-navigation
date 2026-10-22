@@ -62,6 +62,9 @@ def run_git(git: str, *args: str, check: bool = True) -> subprocess.CompletedPro
         text=True,
         encoding="utf-8",
         errors="replace",
+        # Scheduled runs start from pythonw.exe (no console); without this,
+        # every git call pops up a visible console window on Windows.
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     if check and result.returncode != 0:
         raise GitError(
