@@ -23,15 +23,15 @@ from __future__ import annotations
 
 import os
 import pathlib
-import runpy
+import subprocess
 import sys
+import time
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Register Go2Loco-* before Isaac Sim starts (Kit-free by contract).
-import locomotion.isaac  # noqa: E402,F401
+from scripts.run_evidence import finalize, snapshot_start  # noqa: E402
 
 TRAIN_RELPATH = pathlib.Path("scripts") / "reinforcement_learning" / "rsl_rl" / "train.py"
 
@@ -52,12 +52,57 @@ def find_isaaclab_root() -> pathlib.Path:
     )
 
 
+def _arg_value(argv: list[str], name: str) -> str | None:
+    """Return the value of ``--name value`` or ``--name=value`` from argv."""
+    for index, item in enumerate(argv):
+        if item == name and index + 1 < len(argv):
+            return argv[index + 1]
+        if item.startswith(name + "="):
+            return item.split("=", 1)[1]
+    return None
+
+
 def main() -> None:
     isaaclab_root = find_isaaclab_root()
     train_script = isaaclab_root / TRAIN_RELPATH
     # Isaac Lab's train.py imports its sibling ``cli_args`` module.
     sys.path.insert(0, str(train_script.parent))
-    runpy.run_path(str(train_script), run_name="__main__")
+
+    argv = sys.argv[1:]
+    task = _arg_value(argv, "--task") or "unknown-task"
+    seed_text = _arg_value(argv, "--seed")
+    seed = int(seed_text) if seed_text and seed_text.lstrip("-").isdigit() else None
+    run_id = f"{task}-seed{seed if seed is not None else 'na'}-{time.strftime('%Y%m%d-%H%M%S')}"
+
+    # Protocol §7: the evidence record is created at start, never rewritten.
+    pending = snapshot_start(run_id, task, seed, argv)
+    print(f"[evidence] start record: {pending}", flush=True)
+
+    # Isaac Sim terminates its process from C++ during shutdown, so the run
+    # cannot be finalized in-process: launch the launcher as a child and write
+    # the evidence bundle from this parent once it exits.
+    env = dict(os.environ)
+    python_path = [str(PROJECT_ROOT), str(train_script.parent)]
+    if env.get("PYTHONPATH"):
+        python_path.append(env["PYTHONPATH"])
+    env["PYTHONPATH"] = os.pathsep.join(python_path)
+
+    # Gymnasium registrations are per-process: the child must register the
+    # tasks itself before calling the upstream launcher.
+    child_launcher = pathlib.Path(__file__).with_name("_isaac_launcher.py")
+    completed = subprocess.run(
+        [sys.executable, str(child_launcher), str(train_script), *argv],
+        cwd=str(PROJECT_ROOT),
+        env=env,
+    )
+
+    try:
+        config = finalize(pending, None)
+        print(f"[evidence] finalized: {config}", flush=True)
+    except SystemExit as exc:
+        print(f"[evidence] finalize skipped: {exc}", flush=True)
+
+    raise SystemExit(completed.returncode)
 
 
 if __name__ == "__main__":

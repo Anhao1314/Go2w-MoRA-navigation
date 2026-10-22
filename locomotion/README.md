@@ -66,7 +66,21 @@ Isaac Sim 的 Kit 运行时提供——只有 `AppLauncher` 启动后才可导�
 `scripts/train_locomotion.py` 或先启动 `AppLauncher` 再导入。
 `ISAACLAB_ROOT` 可指定 Isaac Lab 检出位置（默认探测 `../IsaacLab`、`D:\work\IsaacLab`）。
 
-## runs/ 产物
+## 训练产物与证据束
 
-训练产物写入 `locomotion/runs/`（已 gitignore），入库存档走既有 evidence
-collector 流程（`scripts/collect_run_evidence.py`），不在本目录直推。
+Isaac Lab 把每次训练写到 `logs/rsl_rl/<experiment_name>/<timestamp>/`（已 gitignore）。
+`scripts/train_locomotion.py` 按协议 §7 自动生成证据束：
+
+- **训练前**：`logs/rsl_rl/_pending/<run-id>.json` —— git SHA、dirty 标记、依赖版本
+  （isaaclab / isaacsim / rsl-rl-lib / torch / gymnasium）、完整命令行、task、seed
+- **训练后**：该 run 目录下的 `run_config.json`（由 pending 记录定稿）+ 
+  `sha256_manifest.json`（目录内每个文件的 SHA-256）
+
+训练被中断时 pending 记录保留，可手动补定稿：
+
+```powershell
+.venv311\Scripts\python.exe scripts\run_evidence.py finalize --run-id <run-id>
+```
+
+入库存档时把 `run_config.json`、评估报告和 manifest 一起提交到 `reports/`；
+`logs/` 本身不入库。
