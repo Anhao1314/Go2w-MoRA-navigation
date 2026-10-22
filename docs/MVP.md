@@ -1,5 +1,7 @@
 # MVP 定义（2026 Q4）
 
+> **已被 [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) 取代（2026-10-23）**：项目方向调整为在 MoRA 架构基础上做可验证仲裁层的架构研究。本文保留为历史决策记录；其中的三种子基线（P0）与证据束要求仍被新计划继承。
+
 [返回首页](../README.md) · [文档索引](README.md) · [路线图](ROADMAP.md) · [实验协议](EXPERIMENT_DESIGN.md)
 
 ## 一句话

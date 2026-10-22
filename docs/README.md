@@ -10,8 +10,9 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [MVP.md](MVP.md) | **MVP 定义**：要解决的问题（跨引擎迁移损失与归因）、方法（三种子基线 → MuJoCo 迁移 → 单因素归因）、成果清单、成功判据、3 周时间盒、降级方案 |
+| [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) | **架构 v0.2 提案 + 研究计划**：在 MoRA 的 S1 与 S0 之间引入可验证仲裁层（ALLOW/CLAMP/FALLBACK/HALT），研究干预率与性能损失的权衡、失败可预判性 |
 | [ROADMAP.md](ROADMAP.md) | **Q4 项目目标与四周路线图**：岗位能力模型、P0–P4 优先级、四周时间表、验收标准、风险预案、讲述要点 |
+| [MVP.md](MVP.md) | 🧊 历史：跨引擎迁移 MVP（已被 ARCHITECTURE_V2 取代，三种子基线仍继承） |
 | [EXPERIMENT_DESIGN.md](EXPERIMENT_DESIGN.md) | **M1/M2 预注册实验协议**（v1.0，2026-10-22 冻结）：研究问题、冻结种子与指标、验收阈值、场景阶梯 S1–S4、基线。Phase-2 的执行契约，changelog 记录一切冻结后变更 |
 | [EXPERIMENT_DATA.md](EXPERIMENT_DATA.md) | 实验数据记录与论文证据协议：一次 run 保存什么、每类数据支持什么结论；Phase-2 沿用同一证据束约定 |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | 第三方许可登记（含 C1 基线仓库的待审查条目） |
