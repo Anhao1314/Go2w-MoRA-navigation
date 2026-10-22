@@ -17,7 +17,12 @@ Usage::
         --episodes 20
 
 Exit codes: 0 = evaluated, 1 = failed.
+
+This script runs only inside the Isaac Lab environment (``.venv311``), which CI
+does not install, so unresolved isaaclab imports are expected there.
 """
+
+# pyright: reportMissingImports=false
 
 from __future__ import annotations
 
@@ -33,6 +38,8 @@ os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from typing import Any, cast
 
 import numpy as np  # noqa: E402
 
@@ -86,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
         env_cfg = parse_env_cfg(args.task, device="cuda:0", num_envs=1, use_fabric=True)
         env_cfg.seed = int(seed)
         env = gym.make(args.task, cfg=env_cfg)
+        # Isaac Lab's manager-based env exposes attributes gym.Env does not type
+        inner = cast(Any, env.unwrapped)
         vec_env = RslRlVecEnvWrapper(env)
 
         from isaaclab_tasks.utils.parse_cfg import load_cfg_from_registry
@@ -96,23 +105,23 @@ def main(argv: list[str] | None = None) -> int:
         policy = runner.get_inference_policy(device="cuda:0")
 
         obs, _ = vec_env.reset()
-        dt = float(env.unwrapped.step_dt)
+        dt = float(inner.step_dt)
         commanded = []
         measured = []
         fell = False
         steps = 0
         with torch.inference_mode():
             while steps < 1000:
-                cmd = env.unwrapped.command_manager.get_command("base_velocity")[0].cpu().numpy()
+                cmd = inner.command_manager.get_command("base_velocity")[0].cpu().numpy()
                 actions = policy(obs)
                 obs, _, dones, _ = vec_env.step(actions)
-                vel = env.unwrapped.scene["robot"].data.root_lin_vel_b[0].cpu().numpy()
-                ang = env.unwrapped.scene["robot"].data.root_ang_vel_b[0].cpu().numpy()
+                vel = inner.scene["robot"].data.root_lin_vel_b[0].cpu().numpy()
+                ang = inner.scene["robot"].data.root_ang_vel_b[0].cpu().numpy()
                 commanded.append([float(cmd[0]), float(cmd[2])])
                 measured.append([float(vel[0]), float(ang[2])])
                 steps += 1
                 if bool(dones[0]):
-                    fell = bool(env.unwrapped.termination_manager.get_term("base_contact")[0])
+                    fell = bool(inner.termination_manager.get_term("base_contact")[0])
                     break
 
         vec_env.close()  # closes the underlying manager-based env too

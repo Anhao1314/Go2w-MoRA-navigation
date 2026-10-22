@@ -21,7 +21,12 @@ Run with the repo's ``.venv311`` interpreter:
       .venv311/Scripts/python.exe scripts/export_go2_model.py
 
 Exit codes: 0 = exported, 1 = failed.
+
+This script runs only inside the Isaac Lab environment (`.venv311`), which CI
+does not install, so unresolved isaaclab/pxr imports are expected there.
 """
+
+# pyright: reportMissingImports=false
 
 from __future__ import annotations
 
@@ -33,6 +38,7 @@ import pathlib
 import re
 import sys
 import time
+from typing import Any, cast
 
 os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
 
@@ -155,7 +161,9 @@ def main(argv: list[str] | None = None) -> int:
     env = gym.make(args.task, cfg=env_cfg)
     env.reset()
 
-    robot = env.unwrapped.scene["robot"]
+    # Isaac Lab's manager-based env exposes attributes gym.Env does not type
+    inner = cast(Any, env.unwrapped)
+    robot = inner.scene["robot"]
     view = robot.root_physx_view
 
     body_names = list(robot.body_names)
