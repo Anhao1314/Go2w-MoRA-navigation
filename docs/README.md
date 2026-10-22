@@ -10,6 +10,8 @@
 
 | 文档 | 内容 |
 | --- | --- |
+| [PLAN.md](PLAN.md) | **执行计划**：WBS（逐任务产出与验收）、过程记录规范（日志 / ADR / 证据卡）、质量门、止损规则 |
+| [PROGRESS.md](PROGRESS.md) | **进度看板（单一入口）**：里程碑状态、本周任务、阻塞项、最近产物 |
 | [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) | **架构 v0.2 提案 + 研究计划**：在 MoRA 的 S1 与 S0 之间引入**C++ 可验证仲裁层**（浮基 FK、CoM/支撑多边形、摩擦锥、RNID；ALLOW/CLAMP/FALLBACK/HALT），研究干预率与性能损失的权衡、失败可预判性、批量实时性 |
 | [ROADMAP.md](ROADMAP.md) | **Q4 项目目标与四周路线图**：岗位能力模型、P0–P4 优先级、四周时间表、验收标准、风险预案、讲述要点 |
 | [MVP.md](MVP.md) | 🧊 历史：跨引擎迁移 MVP（已被 ARCHITECTURE_V2 取代，三种子基线仍继承） |
@@ -59,6 +61,8 @@ Phase-2 尚在起步，除协议文档外暂无独立设计文档；`locomotion/
 
 ## 阅读路径建议
 
+- **了解项目当前在做什么**：[PROGRESS.md](PROGRESS.md) → [PLAN.md](PLAN.md) → [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md)
+- **回放工作过程**：[journal/](journal/)（每日日志）→ [decisions/](decisions/)（架构决策）
 - 复现 Phase-1 结果：首页研究报告 → [USAGE.md](USAGE.md) → 对应 `reports/` 目录
 - 参与 Phase-2：[EXPERIMENT_DESIGN.md](EXPERIMENT_DESIGN.md) → [仓库布局契约](ARCHITECTURE.md#仓库布局契约) → [locomotion/README](../locomotion/README.md) → [MORA_TRAIN.md](MORA_TRAIN.md)（若接入 MoRA runtime）
 - 审查证据链：[EXPERIMENTS.md](EXPERIMENTS.md)（Phase-1 结果表）→ [EXPERIMENT_DATA.md](EXPERIMENT_DATA.md)（证据束约定）→ run 目录与 `evidence_manifest.json`
