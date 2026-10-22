@@ -25,7 +25,7 @@ import argparse
 import pathlib
 import re
 import sys
-from typing import Any
+from typing import Any, cast
 
 import matplotlib
 
@@ -191,7 +191,8 @@ def render(
             )
             progress_text.set_text(f"overall progress: {fraction * 100:.1f}%")
             fig.canvas.draw()
-            frame = np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
+            # Agg canvas exposes the raw buffer, but the base class type does not
+            frame = np.asarray(cast(Any, fig.canvas).buffer_rgba())[:, :, :3]
             writer.append_data(frame)
     finally:
         writer.close()
