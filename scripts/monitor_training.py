@@ -461,7 +461,7 @@ def make_handler(watcher: LogWatcher, page: bytes) -> type[BaseHTTPRequestHandle
                 return
             self.send_error(404)
 
-        def log_message(self, fmt: str, *args: Any) -> None:
+        def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - stdlib signature
             return  # keep the console quiet
 
     return Handler
