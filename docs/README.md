@@ -13,6 +13,7 @@
 | [EXPERIMENT_DESIGN.md](EXPERIMENT_DESIGN.md) | **M1/M2 预注册实验协议**（v1.0，2026-10-22 冻结）：研究问题、冻结种子与指标、验收阈值、场景阶梯 S1–S4、基线。Phase-2 的执行契约，changelog 记录一切冻结后变更 |
 | [EXPERIMENT_DATA.md](EXPERIMENT_DATA.md) | 实验数据记录与论文证据协议：一次 run 保存什么、每类数据支持什么结论；Phase-2 沿用同一证据束约定 |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | 第三方许可登记（含 C1 基线仓库的待审查条目） |
+| [LIVE_SYNC.md](LIVE_SYNC.md) | 本地与 GitHub 的实时同步：提交后自动推送 + 每 2 分钟自动快进 `main`，安装/卸载与边界说明 |
 | [MORA_TRAIN.md](MORA_TRAIN.md) | MoRA-Train 系统层（v0.1）：`mora/` 包接口、当前能力与边界，跨 adapter 复用 |
 | [MORA_RESEARCH.md](MORA_RESEARCH.md) | MoRA 架构深度研究：公开资料还原、仓库差距分析与 v2 路线（研究记录，非复现声明） |
 
