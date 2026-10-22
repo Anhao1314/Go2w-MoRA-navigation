@@ -154,7 +154,10 @@ def sync(status_only: bool, prune: bool, push: bool = False) -> tuple[bool, list
         return False, notes
 
     if ahead:
-        notes.append(f"ahead: {ahead} local commit(s) not pushed")
+        if push and not status_only:
+            notes.extend(push_current_branch(git))
+        else:
+            notes.append(f"ahead: {ahead} local commit(s) not pushed")
         return True, notes
 
     if behind:
