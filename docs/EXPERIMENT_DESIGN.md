@@ -18,7 +18,7 @@
 | Robot | Unitree Go2 (official Isaac Lab asset) |
 | Task | Velocity tracking: commands vx ∈ [-1.0, 1.0] m/s, ωz ∈ [-1.0, 1.0] rad/s, vy = 0 (M1) |
 | Observation | Blind, 87-dim (official `Isaac-Velocity-Flat-UnitreeGo2` spec); perceptive 235-dim deferred to S3 (cloud stretch) |
-| Training | PPO (RSL-RL), 2048 parallel envs, headless, Isaac Lab 2.3.2 + Isaac Sim 5.1 + Python 3.11 |
+| Training | PPO (RSL-RL), 2048 parallel envs, headless, Isaac Lab 2.7.0 + Isaac Sim 5.1 + Python 3.11 |
 | Seeds | T1/T2/T3 = three independent training seeds (logged in each run's config); ≥3 seeds are **required for any RQ1 claim** |
 
 ## 3. Evaluation protocol (frozen)
@@ -71,3 +71,4 @@
 | Date | Change |
 | --- | --- |
 | 2026-10-22 | v1.0 pre-registered before any M1 training run |
+| 2026-10-22 | Version correction (before any training run; no protocol-semantics change): §2 table said "Isaac Lab 2.3.2", but the actual environment prepared for M1 is **Isaac Lab 2.7.0** (isaaclab 0.54.2, editable install of `D:\work\IsaacLab`) + **Isaac Sim 5.1.0.0** (isaacsim 5.1.0.0) + Python 3.11 (repo `.venv311`). Recorded per the freeze rule so the environment of record matches what will actually execute M1; Isaac Sim version was already correct. |

@@ -18,3 +18,7 @@ media/.demo_*.done
 MUJOCO_LOG.TXT
 *.log
 .DS_Store
+# Phase-2 locomotion (Isaac Lab) artifacts
+locomotion/runs/
+logs/
+*.kit

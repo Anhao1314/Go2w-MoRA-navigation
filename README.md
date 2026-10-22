@@ -11,7 +11,13 @@
 - **量化侧：** RL-Sentinel（Mac，时间正确的训练可靠性分析）
 - **适用范围：** 仿真-only；非真实机器人部署；不声称复现官方 MoRA
 
-[English](README.en.md) · [架构与接口](docs/ARCHITECTURE.md) · [实验报告索引](docs/EXPERIMENTS.md) · [复现指南](docs/USAGE.md) · [完整性升级说明](docs/INTEGRITY_UPGRADE.md)
+[English](README.en.md) · [文档索引](docs/README.md) · [架构与接口](docs/ARCHITECTURE.md) · [实验报告索引](docs/EXPERIMENTS.md) · [复现指南](docs/USAGE.md) · [完整性升级说明](docs/INTEGRITY_UPGRADE.md)
+
+> **当前阶段（2026-10-22 起）**
+>
+> - **Phase-1（Go2W 轮式四足导航 adapter）：已完成并冻结归档**。证据与结论以本 README 以下正文（研究报告口径）及 `reports/`、`data/` 归档为准，保持原样。
+> - **Phase-2（Unitree Go2 关节级 RL locomotion，M1/M2）：进行中**。按预注册协议 [docs/EXPERIMENT_DESIGN.md](docs/EXPERIMENT_DESIGN.md)（v1.0，冻结）执行，代码归宿 [`locomotion/`](locomotion/README.md)。
+> - 仓库各区域的归属与冻结状态见[仓库布局契约](docs/ARCHITECTURE.md#仓库布局契约)；全部文档入口见[文档索引](docs/README.md)。
 
 ## 0. 项目定位
 
