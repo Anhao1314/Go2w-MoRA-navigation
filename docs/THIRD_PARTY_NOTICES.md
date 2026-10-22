@@ -47,6 +47,15 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+## Pending license review (no code adopted yet)
+
+### elijah-waichong-chan/go2-convex-mpc
+
+- 项目：https://github.com/elijah-waichong-chan/go2-convex-mpc
+- 计划用途：冻结协议 [EXPERIMENT_DESIGN.md](EXPERIMENT_DESIGN.md) §6 的 **C1 凸 MPC 基线**（MuJoCo + Pinocchio），接入与 RL 策略相同的评估循环（RQ2 按种子配对对比）。
+- 状态：**待审查**。按协议要求，许可审查完成并在此登记结论之前，`locomotion/baselines/convex_mpc/` 不引入任何上游代码或衍生实现。
+- 接入方式意向：wrapper 封装调用（不修改上游代码）；接入位占位见 [locomotion/baselines/convex_mpc/README.md](../locomotion/baselines/convex_mpc/README.md)。
+
 ## C++ control stack dependencies
 
 The P0 `cpp/` build fetches these dependencies at configure/build time; they are

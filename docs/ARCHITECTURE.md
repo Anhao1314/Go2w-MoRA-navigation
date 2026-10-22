@@ -1,6 +1,11 @@
 # MoRA-inspired 分层控制架构
 
-[返回首页](../README.md) · [架构](ARCHITECTURE.md) · [实验](EXPERIMENTS.md) · [使用指南](USAGE.md)
+[返回首页](../README.md) · [文档索引](README.md) · [实验](EXPERIMENTS.md) · [使用指南](USAGE.md)
+
+> **状态说明**：本页正文描述的是 Phase-1（Go2W 轮足导航）的分层控制架构，
+> 已随 Phase-1 冻结归档（2026-10-22）。Phase-2 的结构规则见下方
+> [仓库布局契约](#仓库布局契约)；Phase-2 的实验设计见
+> [EXPERIMENT_DESIGN.md](EXPERIMENT_DESIGN.md)。
 
 本项目在固定仿真导航任务中比较单层学习与分层控制。初始单层 PPO 使用
 61 维观测预测 6 维底层动作；归档实验出现站桩、短程前进或任务未达标。
@@ -75,3 +80,22 @@ System 0（低层运动控制器，脚本/PD）
 
 当前层级通过动作与任务状态接口连接，同时存在对环境内部方法及教师脚本的依赖。替换模块时需要核对几何、观测、动作和评估协议。当前实验只证明
 这种拆分在仓库任务集上有效，不证明任意上层模型或任意真实场景都能直接复用。
+
+## 仓库布局契约（2026-10-22 起）
+
+仓库按「系统层 / 阶段代码 / 证据」三种角色划分区域；新代码必须落入对应区域，
+不得与冻结区混放。各区域状态如下：
+
+| 区域 | 角色 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| `mora/` | MoRA-Train 系统层（TaskAdapter 契约、runtime、memory、progress、事件） | 活跃，跨阶段复用 | 第二个 adapter 也通过 `mora.task` 契约接入 |
+| `rl/`、`scripts/`（Phase-1 训练脚本）、`cpp/`、`models/go2w/`、`mujoco_demos/`、`typings/`、`tools/` | Phase-1 Go2W 轮足导航 adapter | **冻结归档** | 只为复现与证据核查修改；功能演进不再发生。例外：`scripts/` 中跨阶段工具（如 `eval_protocol.py`、`collect_run_evidence.py`）仍可演进 |
+| `locomotion/` | Phase-2 Go2 关节级 RL locomotion（M1/M2） | **活跃**，Phase-2 唯一代码归宿 | 结构与协议对应表见 [locomotion/README](../locomotion/README.md) |
+| `reports/`、`data/`、`media/` | 证据区（实验报告、轨迹、视频） | **append-only** | 已归档证据永不改写；新 run 生成新目录。见 [EXPERIMENT_DATA.md](EXPERIMENT_DATA.md) |
+| `docs/` | 文档 | 活跃 | 入口索引见 [docs/README](README.md)；历史文档正文不回写重释 |
+| `tests/` | 测试 | 活跃 | Phase-1 测试随其代码冻结；新包测试以 `test_<package>_*.py` 命名加入 |
+
+新增阶段的归宿规则：每个后续阶段/adapter 建立独立一级包（如未来的第二个
+Task Adapter），在本契约表登记其角色与状态，禁止向冻结区追加代码。
+`locomotion/isaac/` 依赖 Isaac Lab（`.venv311` 环境），是仓库中唯一有重仿真
+依赖的包；其余包保持纯 Python（或既有 MuJoCo 依赖），保证 CI 可测。
