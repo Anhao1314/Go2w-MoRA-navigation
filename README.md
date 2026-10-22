@@ -17,7 +17,7 @@
 >
 > - **Phase-1（Go2W 轮式四足导航 adapter）：已完成并冻结归档**。证据与结论以本 README 以下正文（研究报告口径）及 `reports/`、`data/` 归档为准，保持原样。
 > - **Phase-2（Unitree Go2 关节级 RL locomotion，M1/M2）：进行中**。按预注册协议 [docs/EXPERIMENT_DESIGN.md](docs/EXPERIMENT_DESIGN.md)（v1.0，冻结）执行，代码归宿 [`locomotion/`](locomotion/README.md)。
-> - **当前研究方向（架构 v0.2）**：[docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md) —— 在 S1 与 S0 之间引入**可验证仲裁层**（ALLOW/CLAMP/FALLBACK/HALT），研究干预率与性能损失的权衡。时间表见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+> - **当前研究主线**：[docs/RESEARCH.md](docs/RESEARCH.md) —— MoRA 式多层架构（S2 规划 / S1 策略 / S0 控制）相比端到端单层，在样本效率、成功率、泛化与失败归因上的量化差异；层间约束（[架构 v0.2](docs/ARCHITECTURE_V2.md)）作为子研究。时间表见 [docs/ROADMAP.md](docs/ROADMAP.md)。
 > - 仓库各区域的归属与冻结状态见[仓库布局契约](docs/ARCHITECTURE.md#仓库布局契约)；全部文档入口见[文档索引](docs/README.md)。
 
 ## 0. 项目定位
