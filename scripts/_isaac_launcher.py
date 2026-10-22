@@ -22,6 +22,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Safe before Kit starts: string-only Gymnasium registrations.
 import locomotion.isaac  # noqa: E402,F401
+import locomotion.sequence  # noqa: E402,F401
 
 
 def main() -> None:
