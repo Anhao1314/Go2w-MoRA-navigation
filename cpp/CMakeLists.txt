@@ -143,3 +143,6 @@ if(GO2W_BUILD_PYTHON)
   target_link_libraries(go2w_py PRIVATE go2w_core)
   install(TARGETS go2w_py LIBRARY DESTINATION . RUNTIME DESTINATION .)
 endif()
+
+# Guardrail: C++ verifiable-arbitration core (architecture v0.2)
+add_subdirectory(guardrail)
