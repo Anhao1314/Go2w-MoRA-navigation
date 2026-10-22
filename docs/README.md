@@ -11,6 +11,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [RESEARCH.md](RESEARCH.md) | **研究主线**：MoRA 式多层架构 vs 端到端单层的受控对比——样本效率、成功率、泛化、失败归因、接口损失；仲裁层降为层间约束子研究 |
+| [notes/training-efficiency.md](notes/training-efficiency.md) | **训练效率调研**：实测算力基线、Rudin 2021 与 Isaac Lab 官方基准、包装器开销、2 路并行与评估并行化方案、效率实验的纪律边界 |
 | [PLAN.md](PLAN.md) | **执行计划**：WBS（逐任务产出与验收）、过程记录规范（日志 / ADR / 证据卡）、质量门、止损规则 |
 | [PROGRESS.md](PROGRESS.md) | **进度看板（单一入口）**：里程碑状态、本周任务、阻塞项、最近产物 |
 | [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) | **架构 v0.2 提案 + 研究计划**：在 MoRA 的 S1 与 S0 之间引入**C++ 可验证仲裁层**（浮基 FK、CoM/支撑多边形、摩擦锥、RNID；ALLOW/CLAMP/FALLBACK/HALT），研究干预率与性能损失的权衡、失败可预判性、批量实时性 |
