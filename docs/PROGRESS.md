@@ -35,7 +35,9 @@
 | 日期 | 产物 | 路径 |
 | --- | --- | --- |
 | 10/23 | Go2 刚体模型（C++ 用） | `locomotion/guardrail/go2_model.json` + `.sha256` |
-| 10/23 | 实时训练面板 | `scripts/monitor_training.py` → `http://127.0.0.1:8777` |
+| 10/23 | 实时训练面板（快照 + 视频入口） | `scripts/monitor_training.py` → `http://127.0.0.1:8777` |
+| 10/23 | 训练过程 MP4 生成器 | `scripts/render_training_video.py`（已验证可生成） |
+| 10/23 | 策略行为 MP4 录制器 | `scripts/render_policy_video.py`（待训练结束后验证） |
 | 10/23 | 架构 v0.2 提案（C++ 仲裁层） | `docs/ARCHITECTURE_V2.md` |
 | 10/23 | 执行计划 + 记录规范 | `docs/PLAN.md` |
 | 10/23 | 每 run 证据束（自动） | `logs/rsl_rl/go2_loco_s1_flat/<stamp>/run_config.json` |
