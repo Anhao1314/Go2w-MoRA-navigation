@@ -1,6 +1,6 @@
 """S1: flat-ground velocity tracking (M1).
 
-Scenario S1 of ``docs/EXPERIMENT_DESIGN.md`` §5: 2048 envs, blind 87-dim
+Scenario S1 of ``docs/EXPERIMENT_DESIGN.md`` §5: 2048 envs, blind 48-dim
 observation, random velocity commands on flat ground.  The scenario adds no
 disturbances on top of the base configuration, so this class exists mainly to
 give the registration entry point a stable, protocol-named home.
