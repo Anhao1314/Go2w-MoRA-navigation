@@ -49,6 +49,27 @@ ITER_TIME = re.compile(r"Iteration time:\s*([\d.]+)s")
 MAX_HISTORY = 400
 MAX_LINES = 120
 
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
+SNAPSHOT_DIR = PROJECT_ROOT / "logs" / "rsl_rl" / "_snapshots"
+MEDIA_DIR = PROJECT_ROOT / "media" / "training"
+
+
+def list_videos() -> list[dict[str, Any]]:
+    """MP4 recordings available for playback in the dashboard."""
+    if not MEDIA_DIR.is_dir():
+        return []
+    videos = []
+    for path in sorted(MEDIA_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
+        stat = path.stat()
+        videos.append(
+            {
+                "name": path.name,
+                "size_mb": round(stat.st_size / 1e6, 2),
+                "mtime": time.strftime("%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)),
+            }
+        )
+    return videos
+
 HTML_PAGE = """<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -135,9 +156,14 @@ HTML_PAGE = """<!doctype html>
   <div class="card" style="margin-top:12px">
     <h2>种子状态</h2>
     <table>
-      <thead><tr><th>Seed</th><th>状态</th><th>迭代</th><th>Reward</th><th>error_xy</th><th>error_yaw</th><th>耗时</th></tr></thead>
+      <thead><tr><th>Seed</th><th>状态</th><th>迭代</th><th>Reward</th><th>error_xy</th><th>error_yaw</th><th>开始</th><th>完成</th><th>耗时</th></tr></thead>
       <tbody id="seeds"></tbody>
     </table>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h2>训练记录视频（MP4）</h2>
+    <div class="sub" id="videos">暂无视频</div>
   </div>
 
   <div class="card" style="margin-top:12px">
@@ -220,8 +246,16 @@ function render(d) {
       <td class="mono">${fmt(s.reward, 3)}</td>
       <td class="mono">${fmt(s.err_xy, 4)}</td>
       <td class="mono">${fmt(s.err_yaw, 4)}</td>
+      <td class="mono">${s.started || "—"}</td>
+      <td class="mono">${s.finished || "—"}</td>
       <td class="mono">${dur(s.elapsed_s)}</td>
     </tr>`).join("");
+
+  const videos = d.videos || [];
+  $("videos").innerHTML = videos.length
+    ? videos.map(v => `<a class="tag t-done" style="margin:2px 6px 2px 0;text-decoration:none"
+         href="/media/${encodeURIComponent(v.name)}" target="_blank">${v.name} · ${v.size_mb} MB</a>`).join("")
+    : "暂无视频（训练结束后用 scripts/render_training_video.py 生成）";
 
   drawCurve(d.history || []);
   $("tail").textContent = (d.recent_lines || []).join("\\n");
@@ -246,11 +280,15 @@ setInterval(tick, 2000);
 class LogWatcher:
     """Incrementally tail-parse a training log into dashboard state."""
 
-    def __init__(self, log_path: pathlib.Path, num_seeds: int = 3) -> None:
+    def __init__(
+        self, log_path: pathlib.Path, num_seeds: int = 3, snapshot_interval_s: float = 15.0
+    ) -> None:
         self.log_path = log_path
         self.num_seeds = num_seeds
+        self.snapshot_interval_s = snapshot_interval_s
         self._offset = 0
         self._lock = threading.Lock()
+        self._last_snapshot_epoch = 0.0
         self._seeds: dict[int, dict[str, Any]] = {
             seed: {
                 "seed": seed,
@@ -399,14 +437,53 @@ class LogWatcher:
                     current_history = history
                 seeds.append(record)
             age = None if self._last_write is None else max(0.0, time.time() - self._last_write)
-            return {
+            payload = {
                 "log_file": self.log_path.name,
                 "log_age_s": age,
                 "seeds": seeds,
                 "history": current_history,
                 "recent_lines": self._lines[-40:],
                 "gpu": read_gpu(),
+                "videos": list_videos(),
             }
+            self._maybe_record_snapshot(payload)
+            return payload
+
+    def _maybe_record_snapshot(self, payload: dict[str, Any]) -> None:
+        """Append a period snapshot to JSONL so the run can be replayed later."""
+        now = time.time()
+        if now - self._last_snapshot_epoch < self.snapshot_interval_s:
+            return
+        self._last_snapshot_epoch = now
+        try:
+            SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+            path = SNAPSHOT_DIR / f"training_{time.strftime('%Y%m%d')}.jsonl"
+            record = {
+                "t": round(now, 3),
+                "log_age_s": payload["log_age_s"],
+                "gpu": payload["gpu"],
+                "seeds": [
+                    {
+                        key: seed.get(key)
+                        for key in (
+                            "seed",
+                            "state",
+                            "iteration",
+                            "max_iteration",
+                            "reward",
+                            "err_xy",
+                            "err_yaw",
+                            "elapsed_s",
+                            "eta_s",
+                        )
+                    }
+                    for seed in payload["seeds"]
+                ],
+            }
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except OSError:
+            pass  # a snapshot failure must never break the dashboard
 
 
 def read_gpu() -> dict[str, Any] | None:
@@ -459,6 +536,19 @@ def make_handler(watcher: LogWatcher, page: bytes) -> type[BaseHTTPRequestHandle
                 self.end_headers()
                 self.wfile.write(page)
                 return
+            if self.path.startswith("/media/"):
+                name = self.path[len("/media/"):]
+                candidate = (MEDIA_DIR / name).resolve()
+                if candidate.parent != MEDIA_DIR.resolve() or not candidate.is_file():
+                    self.send_error(404)
+                    return
+                data = candidate.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "video/mp4")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
             self.send_error(404)
 
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - stdlib signature
@@ -472,9 +562,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--log", type=pathlib.Path, required=True)
     parser.add_argument("--port", type=int, default=8777)
     parser.add_argument("--seeds", type=int, default=3)
+    parser.add_argument(
+        "--snapshot-interval",
+        type=float,
+        default=15.0,
+        help="seconds between JSONL snapshots written for later replay",
+    )
     args = parser.parse_args(argv)
 
-    watcher = LogWatcher(args.log, num_seeds=args.seeds)
+    watcher = LogWatcher(
+        args.log, num_seeds=args.seeds, snapshot_interval_s=args.snapshot_interval
+    )
     watcher.refresh()
     page = HTML_PAGE.encode("utf-8")
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(watcher, page))
