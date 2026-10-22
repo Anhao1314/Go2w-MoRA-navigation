@@ -9,7 +9,7 @@
 | 里程碑 | 计划日期 | 状态 | 证据卡（产物 + 验证） |
 | --- | --- | --- | --- |
 | M0 环境 / 协议 / 证据束就绪 | 10/23 | ✅ 完成 | [locomotion/README](../locomotion/README.md)；`python scripts/eval_protocol.py --verify` 全 PASS；2-iteration 冒烟通过 |
-| M1 三种子基线 + C++ 运动学 | 10/29 | 🔄 进行中 | 待产出 |
+| M1 三种子基线 + C++ 运动学 | 10/29 | ✅ 基线达标（运动学第一版已进 CI） | 三份证据束；评估 `vx 0.0569±0.0011` / `ωz 0.0872±0.0017` / `fall 0`；[报告](../reports/locomotion/m1_evaluation.md) |
 | M2 C++ 完整仲裁核心 + 集成 | 11/05 | ⏳ 未开始 | — |
 | M3 A/B/C 实验 + 归因 | 11/12 | ⏳ 未开始 | — |
 | M4 报告 + 演示 | 11/19 | ⏳ 未开始 | — |
@@ -19,7 +19,9 @@
 | ID | 任务 | 状态 | 备注 |
 | --- | --- | --- | --- |
 | W1.0 | 计划、记录规范、ADR 骨架 | ✅ | [PLAN.md](PLAN.md)、[decisions/](decisions/) |
-| W1.1 | S1 三种子训练（seed 0/1/2） | ✅ 完成（1205 / 1232 / 1194 s，全部 rc=0） | 三份证据束（各 31 checkpoints / 37 文件哈希）；首个评估 episode 达标（vx 0.043 / ωz 0.089） |
+| W1.1 | S1 三种子训练（seed 0/1/2）+ 评估 | ✅ 完成（1205 / 1232 / 1194 s，全部 rc=0） | 三份证据束（各 31 checkpoints / 37 文件哈希）；三种子评估全部达标，报告见 `reports/locomotion/m1_evaluation.md` |
+| W1.1b | 训练记录视频（指标动画） | ✅ | `media/training/m1_training_progress.mp4`（4500 条记录 / 45 秒） |
+| W1.1c | 策略行为录像 | ⚠️ 失败，待修 | `render_policy_video.py` 触发 Kit access violation，见 journal |
 | W1.2 | Go2 模型参数导出 | ✅ | `locomotion/guardrail/go2_model.json`（19 bodies / 12 joints / 14.971 kg / SHA-256 `12b78af4`） |
 | W1.3 | C++ 浮基 FK + CoM + 支撑多边形 | 🟡 第一版完成 | `cpp/guardrail/`（model/kinematics/tests）；CI cpp job 编译与测试通过 |
 | W1.4 | 数值对比报告 | ⏳ | 与 Isaac 的 FK/CoM 对比 |
