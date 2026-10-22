@@ -17,7 +17,7 @@
 >
 > - **Phase-1（Go2W 轮式四足导航 adapter）：已完成并冻结归档**。证据与结论以本 README 以下正文（研究报告口径）及 `reports/`、`data/` 归档为准，保持原样。
 > - **Phase-2（Unitree Go2 关节级 RL locomotion，M1/M2）：进行中**。按预注册协议 [docs/EXPERIMENT_DESIGN.md](docs/EXPERIMENT_DESIGN.md)（v1.0，冻结）执行，代码归宿 [`locomotion/`](locomotion/README.md)。
-> - **Q4 目标与四周路线图**：[docs/ROADMAP.md](docs/ROADMAP.md)（P0 平地三种子达标 → P1 RL vs 基线归因 → P2 扰动 → P3 Sim2Sim）。
+> - **MVP 与路线图**：[docs/MVP.md](docs/MVP.md)（3 周：三种子基线 → Isaac→MuJoCo 迁移 → 执行器/接触/延迟归因）；[docs/ROADMAP.md](docs/ROADMAP.md)（四周排期、优先级与砍单顺序）。
 > - 仓库各区域的归属与冻结状态见[仓库布局契约](docs/ARCHITECTURE.md#仓库布局契约)；全部文档入口见[文档索引](docs/README.md)。
 
 ## 0. 项目定位
