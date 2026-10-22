@@ -17,7 +17,7 @@
 | --- | --- |
 | Robot | Unitree Go2 (official Isaac Lab asset) |
 | Task | Velocity tracking: commands vx ∈ [-1.0, 1.0] m/s, ωz ∈ [-1.0, 1.0] rad/s, vy = 0 (M1) |
-| Observation | Blind, 87-dim (official `Isaac-Velocity-Flat-UnitreeGo2` spec); perceptive 235-dim deferred to S3 (cloud stretch) |
+| Observation | Blind, 48-dim (official `Isaac-Velocity-Flat-UnitreeGo2` spec, measured); perceptive 235-dim deferred to S3 (cloud stretch) |
 | Training | PPO (RSL-RL), 2048 parallel envs, headless, Isaac Lab 2.7.0 + Isaac Sim 5.1 + Python 3.11 |
 | Seeds | T1/T2/T3 = three independent training seeds (logged in each run's config); ≥3 seeds are **required for any RQ1 claim** |
 
@@ -48,7 +48,7 @@
 
 | Scenario | Configuration | Feeds | Timing |
 | --- | --- | --- | --- |
-| S1 flat velocity tracking | 2048 envs, blind 87-dim, random commands | RQ1 RQ2 | M1 |
+| S1 flat velocity tracking | 2048 envs, blind 48-dim, random commands | RQ1 RQ2 | M1 |
 | S2 disturbance & robustness | 100 N / 0.5 s pushes, ±3 kg payload, friction step; ablation A1–A3 (DR-off / DR-on / +distillation) | RQ2 RQ3 | M2 |
 | S2b light terrain | low-amplitude rough ground (noise 2–5 cm) + slopes ≤ 15° | RQ3 | M2–M3 |
 | S3 stair curriculum (cloud stretch) | official Rough composition incl. `HfPyramidStairs` 5–13 cm, perceptive 235-dim | RQ3 | budget-gated |
@@ -72,3 +72,4 @@
 | --- | --- |
 | 2026-10-22 | v1.0 pre-registered before any M1 training run |
 | 2026-10-22 | Version correction (before any training run; no protocol-semantics change): §2 table said "Isaac Lab 2.3.2", but the actual environment prepared for M1 is **Isaac Lab 2.7.0** (isaaclab 0.54.2, editable install of `D:\work\IsaacLab`) + **Isaac Sim 5.1.0.0** (isaacsim 5.1.0.0) + Python 3.11 (repo `.venv311`). Recorded per the freeze rule so the environment of record matches what will actually execute M1; Isaac Sim version was already correct. |
+| 2026-10-22 | Observation-dimension correction (before any training run): the protocol said "blind 87-dim", but the interface of record was measured on the actual task (`Go2Loco-S1-Flat-Blind-v0`, Kit 5.1 + Isaac Lab 2.7.0): policy obs is **48-dim** = base_lin_vel 3 + base_ang_vel 3 + projected_gravity 3 + velocity_commands 3 + joint_pos 12 + joint_vel 12 + actions 12. The perceptive 235-dim figure is consistent (48 + 187 height scan) and unchanged. 87 is treated as a transcription error; thresholds and metrics are unaffected. |

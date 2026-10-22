@@ -3,8 +3,10 @@
 Derives from the official Isaac Lab ``UnitreeGo2FlatEnvCfg`` and pins the
 frozen protocol values (``docs/EXPERIMENT_DESIGN.md`` §2):
 
-- blind 87-dim observation (official ``Isaac-Velocity-Flat-UnitreeGo2`` spec,
-  no height scan, no perceptive inputs);
+- blind 48-dim observation (official ``Isaac-Velocity-Flat-UnitreeGo2`` spec,
+  no height scan, no perceptive inputs: base_lin_vel 3 + base_ang_vel 3 +
+  projected_gravity 3 + velocity_commands 3 + joint_pos 12 + joint_vel 12 +
+  actions 12);
 - commands: vx ∈ [-1.0, 1.0] m/s, vy = 0 m/s, wz ∈ [-1.0, 1.0] rad/s, direct
   velocity commands (``heading_command`` disabled so the commanded vx/wz pair
   is exactly what the protocol metrics score);

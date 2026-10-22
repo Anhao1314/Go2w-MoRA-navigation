@@ -22,3 +22,6 @@ MUJOCO_LOG.TXT
 locomotion/runs/
 logs/
 *.kit
+
+# Hydra run directory from the Isaac Lab launcher
+outputs/

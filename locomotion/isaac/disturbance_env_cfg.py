@@ -13,6 +13,9 @@ TODO(M2) and must be settled before the first M2 training run, not after.
 
 from __future__ import annotations
 
+import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp
+from isaaclab.managers import EventTermCfg as EventTerm
+from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils import configclass
 from isaaclab_tasks.manager_based.locomotion.velocity.config.go2.rough_env_cfg import (
     UnitreeGo2RoughEnvCfg,
@@ -59,13 +62,26 @@ class Go2S2DisturbanceEnvCfg(Go2BlindVelocityEnvCfg):
         # post init of parent
         super().__post_init__()
 
-        # frozen push: 100 N for 0.5 s lateral, expressed as a velocity step
-        # TODO(M2): pin the per-seed push schedule for evaluation episodes
-        self.events.push_robot.interval_range_s = (10.0, 15.0)
-        self.events.push_robot.params["velocity_range"] = {
-            "x": (0.0, 0.0),
-            "y": (-PUSH_VELOCITY_RANGE_MPS, PUSH_VELOCITY_RANGE_MPS),
-        }
+        # The official Go2 rough/flat configs disable ``push_robot``
+        # (config/go2/rough_env_cfg.py sets it to None), so it must be
+        # re-created rather than mutated.
+        # Frozen push: 100 N for 0.5 s lateral, expressed as the equivalent
+        # base velocity step (impulse / nominal base mass).
+        # TODO(M2): the protocol requires a *timeable* push at evaluation;
+        # add a deterministic evaluate-time force term (apply_external_force_torque
+        # at a pinned offset) and keep this interval term for training only.
+        self.events.push_robot = EventTerm(
+            func=mdp.push_by_setting_velocity,
+            mode="interval",
+            interval_range_s=(10.0, 15.0),
+            params={
+                "velocity_range": {
+                    "x": (0.0, 0.0),
+                    "y": (-PUSH_VELOCITY_RANGE_MPS, PUSH_VELOCITY_RANGE_MPS),
+                },
+                "asset_cfg": SceneEntityCfg("robot"),
+            },
+        )
 
         # frozen payload: +/-3 kg on the base
         self.events.add_base_mass.params["mass_distribution_params"] = PAYLOAD_MASS_RANGE_KG
@@ -76,7 +92,7 @@ class Go2S2DisturbanceEnvCfg(Go2BlindVelocityEnvCfg):
 
 @configclass
 class Go2S2bLightTerrainEnvCfg(UnitreeGo2RoughEnvCfg):
-    """S2b: light rough terrain, still blind (no height scanner, 87-dim obs)."""
+    """S2b: light rough terrain, still blind (no height scanner, 48-dim obs)."""
 
     def __post_init__(self):
         # post init of parent
