@@ -1,0 +1,13 @@
+#!/bin/sh
+# Live sync: after every commit, push the current branch upstream when ahead.
+# Installed by scripts/install_live_sync.ps1 (sets core.hooksPath = .githooks).
+# Failures never block the commit; they are recorded in logs/autosync.log.
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+
+py="$root/.venv311/Scripts/python.exe"
+if [ ! -x "$py" ]; then
+    py=$(command -v python3 2>/dev/null || command -v python 2>/dev/null) || exit 0
+fi
+
+"$py" "$root/scripts/sync_repo.py" --push --quiet >/dev/null 2>&1
+exit 0

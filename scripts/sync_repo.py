@@ -225,7 +225,10 @@ def main(argv: list[str] | None = None) -> int:
         ok = False
 
     if args.quiet:
-        write_log(args.log, notes)
+        # keep the scheduled-run log readable: only record actual changes/problems
+        meaningful = [note for note in notes if note.strip() != "up to date"]
+        if meaningful:
+            write_log(args.log, meaningful)
     else:
         print(f"[sync] {PROJECT_ROOT}")
         for note in notes:
