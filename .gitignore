@@ -3,6 +3,7 @@ __pycache__/
 build/
 deps/
 .venv/
+.venv311/
 .conda/
 .pytest_cache/
 .coverage
