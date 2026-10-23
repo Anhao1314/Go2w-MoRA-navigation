@@ -49,10 +49,35 @@ ERR_YAW = re.compile(r"error_vel_yaw:\s*(-?[\d.]+)")
 SEED_COLORS = ["#4c8dff", "#3ddc97", "#f5a524", "#ff5c5c"]
 
 
+def _flush(
+    seeds: dict[int, list[dict[str, float]]], current: int | None, pending: dict[str, float]
+) -> None:
+    """Commit one finished iteration; tracking errors are optional.
+
+    The velocity-tracking task logs ``error_vel_xy``/``error_vel_yaw``; the
+    sequence task does not, so those fields fall back to NaN and the renderer
+    simply draws no line for them.
+    """
+    if current is None or "iteration" not in pending or "reward" not in pending:
+        return
+    seeds.setdefault(current, []).append(
+        {
+            "iteration": pending["iteration"],
+            "max_iteration": pending.get("max_iteration", 1500.0),
+            "reward": pending["reward"],
+            "err_xy": pending.get("err_xy", float("nan")),
+            "err_yaw": pending.get("err_yaw", float("nan")),
+        }
+    )
+
+
 def parse_log(path: pathlib.Path) -> dict[int, list[dict[str, float]]]:
     """Extract one record per iteration: iteration, reward, err_xy, err_yaw."""
-    seeds: dict[int, list[dict[str, float]]] = {}
-    current: int | None = None
+    # A directly launched run has no "=== SEED n START ===" marker (that line
+    # is written by the three-seed loop), so assume seed 0 until a marker says
+    # otherwise.  Logs from the three-seed loop switch on the first marker.
+    seeds: dict[int, list[dict[str, float]]] = {0: []}
+    current: int | None = 0
     pending: dict[str, float] = {}
 
     with path.open("r", encoding="utf-8", errors="replace") as handle:
@@ -62,6 +87,7 @@ def parse_log(path: pathlib.Path) -> dict[int, list[dict[str, float]]]:
                 continue
             match = SEED_START.search(line)
             if match:
+                _flush(seeds, current, pending)
                 current = int(match.group(1))
                 seeds.setdefault(current, [])
                 pending = {}
@@ -70,8 +96,11 @@ def parse_log(path: pathlib.Path) -> dict[int, list[dict[str, float]]]:
                 continue
             match = ITERATION.search(line)
             if match:
-                pending["iteration"] = float(match.group(1))
-                pending["max_iteration"] = float(match.group(2))
+                _flush(seeds, current, pending)
+                pending = {
+                    "iteration": float(match.group(1)),
+                    "max_iteration": float(match.group(2)),
+                }
                 continue
             match = MEAN_REWARD.search(line)
             if match:
@@ -84,9 +113,8 @@ def parse_log(path: pathlib.Path) -> dict[int, list[dict[str, float]]]:
             match = ERR_YAW.search(line)
             if match:
                 pending["err_yaw"] = float(match.group(1))
-                if all(key in pending for key in ("iteration", "reward", "err_xy", "err_yaw")):
-                    seeds[current].append(dict(pending))
-                pending = {}
+                continue
+    _flush(seeds, current, pending)
     return {seed: rows for seed, rows in seeds.items() if rows}
 
 
@@ -144,8 +172,12 @@ def render(
     style(ax_yaw, "Yaw-rate tracking error", "rad/s")
     for ax, values in ((ax_reward, reward_all), (ax_xy, xy_all), (ax_yaw, yaw_all)):
         ax.set_xlim(float(iter_all.min()), float(iter_all.max()) + 1)
-        pad = (float(values.max()) - float(values.min())) * 0.08 + 1e-3
-        ax.set_ylim(float(values.min()) - pad, float(values.max()) + pad)
+        finite = values[np.isfinite(values)]
+        if finite.size == 0:
+            ax.set_ylim(0.0, 1.0)  # metric absent in this task; leave the axes empty
+            continue
+        pad = (float(finite.max()) - float(finite.min())) * 0.08 + 1e-3
+        ax.set_ylim(float(finite.min()) - pad, float(finite.max()) + pad)
 
     lines = {}
     for offset, seed in enumerate(seeds):

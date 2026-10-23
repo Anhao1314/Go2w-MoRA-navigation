@@ -50,6 +50,11 @@ MAX_HISTORY = 400
 MAX_LINES = 120
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    # run directly, sys.path[0] is scripts/, so the package root must be added
+    # for the deferred ``from scripts.render_training_video import ...``
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 SNAPSHOT_DIR = PROJECT_ROOT / "logs" / "rsl_rl" / "_snapshots"
 MEDIA_DIR = PROJECT_ROOT / "media" / "training"
 
@@ -252,10 +257,19 @@ function render(d) {
     </tr>`).join("");
 
   const videos = d.videos || [];
-  $("videos").innerHTML = videos.length
+  const vr = d.video_renderer;
+  let html = videos.length
     ? videos.map(v => `<a class="tag t-done" style="margin:2px 6px 2px 0;text-decoration:none"
          href="/media/${encodeURIComponent(v.name)}" target="_blank">${v.name} · ${v.size_mb} MB</a>`).join("")
-    : "暂无视频（训练结束后用 scripts/render_training_video.py 生成）";
+    : "暂无视频";
+  if (vr) {
+    const detail = vr.last_error
+      ? `<span style="color:#ff5c5c">渲染失败：${vr.last_error}</span>`
+      : `后台渲染中 · 每 ${vr.interval_s}s 刷新 · 已完成 ${vr.renders} 次` +
+        (vr.last_render_s ? ` · 上次耗时 ${vr.last_render_s}s` : "");
+    html += `<div class="sub" style="margin-top:8px">${detail}</div>`;
+  }
+  $("videos").innerHTML = html;
 
   drawCurve(d.history || []);
   $("tail").textContent = (d.recent_lines || []).join("\\n");
@@ -526,11 +540,92 @@ def read_gpu() -> dict[str, Any] | None:
         return None
 
 
-def make_handler(watcher: LogWatcher, page: bytes) -> type[BaseHTTPRequestHandler]:
+class VideoRenderer(threading.Thread):
+    """Render the current run into an MP4 on a fixed interval.
+
+    CPU work by design: it replays the log, never touches the simulator.  The
+    interval is a deliberate compromise -- frequent enough to feel live, rare
+    enough not to compete with the trainer for the CPU.
+    """
+
+    def __init__(
+        self, log_path: pathlib.Path, out_path: pathlib.Path, interval_s: float, stride: int, fps: int
+    ) -> None:
+        super().__init__(daemon=True)
+        self.log_path = log_path
+        self.out_path = out_path
+        self.interval_s = interval_s
+        self.stride = stride
+        self.fps = fps
+        self._stop_event = threading.Event()
+        self.last_render_s: float | None = None
+        self.last_error: str | None = None
+        self.renders = 0
+
+    def run(self) -> None:
+        self.render_once()
+        while not self._stop_event.wait(self.interval_s):
+            self.render_once()
+
+    def render_once(self) -> None:
+        """Render in a child process.
+
+        matplotlib is not reliably thread-safe, so running it inside the
+        dashboard process can hang the render thread (observed).  A child
+        process is isolated, bounded by a timeout, and cannot stall the API.
+        """
+        script = PROJECT_ROOT / "scripts" / "render_training_video.py"
+        command = [
+            sys.executable,
+            str(script),
+            "--log",
+            str(self.log_path),
+            "--out",
+            str(self.out_path),
+            "--stride",
+            str(self.stride),
+            "--fps",
+            str(self.fps),
+        ]
+        started = time.time()
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=600)
+            if result.returncode != 0:
+                tail = (result.stderr or result.stdout).strip().splitlines()
+                self.last_error = tail[-1] if tail else f"exit {result.returncode}"
+                return
+            self.last_render_s = time.time() - started
+            self.renders += 1
+            self.last_error = None
+        except subprocess.TimeoutExpired:
+            self.last_error = "render timed out after 600 s"
+        except Exception as exc:  # never let a render kill the dashboard
+            self.last_error = f"{type(exc).__name__}: {exc}"
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "active": True,
+            "interval_s": self.interval_s,
+            "renders": self.renders,
+            "last_render_s": None if self.last_render_s is None else round(self.last_render_s, 1),
+            "last_error": self.last_error,
+            "file": self.out_path.name,
+        }
+
+
+def make_handler(
+    watcher: LogWatcher, page: bytes, renderer: VideoRenderer | None = None
+) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802 - stdlib naming
             if self.path.startswith("/api/status"):
-                payload = json.dumps(watcher.snapshot(), ensure_ascii=False).encode("utf-8")
+                status = watcher.snapshot()
+                if renderer is not None:
+                    status["video_renderer"] = renderer.status()
+                payload = json.dumps(status, ensure_ascii=False).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
@@ -577,14 +672,34 @@ def main(argv: list[str] | None = None) -> int:
         default=15.0,
         help="seconds between JSONL snapshots written for later replay",
     )
+    parser.add_argument(
+        "--video-interval",
+        type=float,
+        default=300.0,
+        help="seconds between MP4 refreshes; 0 disables background rendering",
+    )
+    parser.add_argument("--video-stride", type=int, default=12, help="log records per video frame")
+    parser.add_argument("--video-fps", type=int, default=15)
     args = parser.parse_args(argv)
 
     watcher = LogWatcher(
         args.log, num_seeds=args.seeds, snapshot_interval_s=args.snapshot_interval
     )
     watcher.refresh()
+
+    renderer: VideoRenderer | None = None
+    if args.video_interval > 0:
+        renderer = VideoRenderer(
+            log_path=args.log,
+            out_path=MEDIA_DIR / f"{args.log.stem}_progress.mp4",
+            interval_s=args.video_interval,
+            stride=args.video_stride,
+            fps=args.video_fps,
+        )
+        renderer.start()
+
     page = HTML_PAGE.encode("utf-8")
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(watcher, page))
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(watcher, page, renderer))
     url = f"http://127.0.0.1:{args.port}"
     print(f"[monitor] watching {args.log}")
     print(f"[monitor] open {url}")
