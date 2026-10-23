@@ -270,7 +270,20 @@ def evaluate_sequence(
     env_cfg.seed = 0
     env = gym.make(args.task, cfg=env_cfg)
     inner = cast(Any, env.unwrapped)
+    if bool(args.layered):
+        if args.s0_checkpoint is None:
+            raise SystemExit("--layered requires --s0-checkpoint")
+        from locomotion.sequence.layered_env import LayeredSequenceEnv, load_s0_actor
+
+        s0_actor = load_s0_actor(args.s0_checkpoint, device="cuda:0")
+        env = LayeredSequenceEnv(env, s0_actor, device="cuda:0")
+        print(f"[eval] layered mode, S0 from {args.s0_checkpoint}", flush=True)
+
     vec_env = RslRlVecEnvWrapper(env)
+    if bool(args.layered):
+        # group B acts in command space; the official wrapper would otherwise
+        # report the 12 joint dimensions from the manager
+        vec_env.num_actions = int(gym.spaces.flatdim(env.action_space))
 
     runner_cfg = load_cfg_from_registry(args.task, "rsl_rl_cfg_entry_point")
     runner = OnPolicyRunner(vec_env, runner_cfg.to_dict(), log_dir=None, device="cuda:0")
@@ -370,6 +383,17 @@ def main(argv: list[str] | None = None) -> int:
         type=pathlib.Path,
         default=None,
         help="save env 0's body positions and stage per step to this .npz (sequence tasks)",
+    )
+    parser.add_argument(
+        "--layered",
+        action="store_true",
+        help="evaluate a layered policy: 2-dim commands executed by a frozen S0",
+    )
+    parser.add_argument(
+        "--s0-checkpoint",
+        type=pathlib.Path,
+        default=None,
+        help="S0 policy checkpoint required by --layered",
     )
     args = parser.parse_args(argv)
 
