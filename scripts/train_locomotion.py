@@ -99,6 +99,26 @@ def main() -> None:
     try:
         config = finalize(pending, None)
         print(f"[evidence] finalized: {config}", flush=True)
+        # Formal training report, generated as a child process so a report
+        # failure can never invalidate a finished run.
+        report = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "scripts" / "train_report.py"),
+                "--run-dir",
+                str(config.parent),
+            ],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+        )
+        if report.returncode == 0:
+            print(f"[evidence] report: {(report.stdout or '').strip()}", flush=True)
+        else:
+            print(
+                f"[evidence] report skipped: {(report.stderr or report.stdout or '').strip()[:200]}",
+                flush=True,
+            )
     except SystemExit as exc:
         print(f"[evidence] finalize skipped: {exc}", flush=True)
 

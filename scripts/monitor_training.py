@@ -57,6 +57,24 @@ if str(PROJECT_ROOT) not in sys.path:
 
 SNAPSHOT_DIR = PROJECT_ROOT / "logs" / "rsl_rl" / "_snapshots"
 MEDIA_DIR = PROJECT_ROOT / "media" / "training"
+REPORTS_DIR = PROJECT_ROOT / "reports" / "training"
+
+
+def list_reports() -> list[dict[str, Any]]:
+    """Formal training reports written by scripts/train_report.py."""
+    if not REPORTS_DIR.is_dir():
+        return []
+    reports = []
+    for path in sorted(REPORTS_DIR.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+        stat = path.stat()
+        reports.append(
+            {
+                "name": path.name,
+                "size_kb": round(stat.st_size / 1024, 1),
+                "mtime": time.strftime("%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)),
+            }
+        )
+    return reports
 
 
 def list_videos() -> list[dict[str, Any]]:
@@ -167,6 +185,11 @@ HTML_PAGE = """<!doctype html>
   </div>
 
   <div class="card" style="margin-top:12px">
+    <h2>训练报告（Markdown，训练结束时自动生成）</h2>
+    <div class="sub" id="reports">暂无报告</div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
     <h2>训练记录视频（MP4）</h2>
     <div class="sub" id="videos">暂无视频</div>
   </div>
@@ -270,6 +293,12 @@ function render(d) {
     html += `<div class="sub" style="margin-top:8px">${detail}</div>`;
   }
   $("videos").innerHTML = html;
+
+  const reports = d.reports || [];
+  $("reports").innerHTML = reports.length
+    ? reports.map(r => `<a class="tag t-done" style="margin:2px 6px 2px 0;text-decoration:none"
+         href="/reports/${encodeURIComponent(r.name)}" target="_blank">${r.name} · ${r.size_kb} KB · ${r.mtime}</a>`).join("")
+    : "暂无报告（训练结束时由 train_locomotion.py 自动生成）";
 
   drawCurve(d.history || []);
   $("tail").textContent = (d.recent_lines || []).join("\\n");
@@ -468,6 +497,7 @@ class LogWatcher:
                 "recent_lines": self._lines[-40:],
                 "gpu": read_gpu(),
                 "videos": list_videos(),
+                "reports": list_reports(),
             }
             self._maybe_record_snapshot(payload)
             return payload
@@ -639,6 +669,19 @@ def make_handler(
                 self.send_header("Content-Length", str(len(page)))
                 self.end_headers()
                 self.wfile.write(page)
+                return
+            if self.path.startswith("/reports/"):
+                name = self.path[len("/reports/"):]
+                candidate = (REPORTS_DIR / name).resolve()
+                if candidate.parent != REPORTS_DIR.resolve() or not candidate.is_file():
+                    self.send_error(404)
+                    return
+                data = candidate.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
                 return
             if self.path.startswith("/media/"):
                 name = self.path[len("/media/"):]
