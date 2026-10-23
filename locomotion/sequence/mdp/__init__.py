@@ -69,12 +69,24 @@ def _wrap(angle: torch.Tensor) -> torch.Tensor:
 
 
 def _targets(env: ManagerBasedRLEnv) -> tuple[torch.Tensor, torch.Tensor]:
-    """Return (P1, P2) world positions for the current episode."""
+    """Return (P1, P2) in world coordinates, defined relative to the initial heading.
+
+    The first version used world +x / +y, which was a real bug: the policy
+    tracks the *body-frame* command, and `reset_base` randomises the initial
+    yaw, so walking "forward" in body frame does not approach a world +x
+    target.  Training looked healthy (velocity tracking 0.74) while no episode
+    ever left stage 0.
+
+    The path is now an L shape anchored on the start pose: P1 is 2 m along the
+    initial heading, P2 is another 2 m along that heading turned by +90 degrees.
+    """
     state = _state(env)
-    p1 = torch.stack((state.start[:, 0] + FORWARD_DISTANCE_M, state.start[:, 1]), dim=1)
-    p2 = torch.stack(
-        (state.start[:, 0] + FORWARD_DISTANCE_M, state.start[:, 1] + FORWARD_DISTANCE_M), dim=1
-    )
+    heading0 = state.start[:, 2]
+    heading1 = heading0 + TURN_RADIANS
+    forward1 = torch.stack((torch.cos(heading0), torch.sin(heading0)), dim=1)
+    forward2 = torch.stack((torch.cos(heading1), torch.sin(heading1)), dim=1)
+    p1 = state.start[:, :2] + FORWARD_DISTANCE_M * forward1
+    p2 = p1 + FORWARD_DISTANCE_M * forward2
     return p1, p2
 
 

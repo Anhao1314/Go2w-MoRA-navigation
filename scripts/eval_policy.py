@@ -284,10 +284,17 @@ def evaluate_sequence(
     done_step = np.full(num_envs, steps_max, dtype=int)
     active = np.ones(num_envs, dtype=bool)
 
+    record = args.record_trajectory is not None
+    body_track: list[np.ndarray] = []
+    stage_track: list[int] = []
+
     with torch.inference_mode():
         for step in range(steps_max):
             stage = _as_float(inner._seq_state.stage).astype(int)
             max_stage[active] = np.maximum(max_stage[active], stage[active])
+            if record and active[0]:
+                body_track.append(_as_float(inner.scene["robot"].data.body_pos_w[0]).copy())
+                stage_track.append(int(stage[0]))
             actions = policy(obs)
             obs, _, dones, _ = vec_env.step(actions)
             newly_done = _as_bool(dones) & active
@@ -296,6 +303,18 @@ def evaluate_sequence(
                 active[newly_done] = False
             if not active.any():
                 break
+
+    if record and body_track and args.record_trajectory is not None:
+        args.record_trajectory.parent.mkdir(parents=True, exist_ok=True)
+        np.savez(
+            args.record_trajectory,
+            body_pos=np.asarray(body_track),
+            stage=np.asarray(stage_track),
+            body_names=np.asarray(list(inner.scene["robot"].body_names)),
+            dt=float(inner.step_dt),
+            seed=int(seeds[0]),
+        )
+        print(f"[eval] trajectory saved: {args.record_trajectory} ({len(body_track)} steps)")
 
     succeeded = {int(index) for index in getattr(inner, "_seq_success_log", set())}
     vec_env.close()
@@ -345,6 +364,12 @@ def main(argv: list[str] | None = None) -> int:
         "--serial",
         action="store_true",
         help="one environment per seed, rebuilt per episode (faithful but ~20x slower)",
+    )
+    parser.add_argument(
+        "--record-trajectory",
+        type=pathlib.Path,
+        default=None,
+        help="save env 0's body positions and stage per step to this .npz (sequence tasks)",
     )
     args = parser.parse_args(argv)
 
