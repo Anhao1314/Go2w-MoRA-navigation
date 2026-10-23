@@ -48,6 +48,10 @@ class Go2SequenceEnvCfg(Go2BlindVelocityEnvCfg):
         # smoothness terms (feet_slide, torques, action rate) remain.
         self.rewards.feet_air_time = None
         self.rewards.stage = RewTerm(func=seq_mdp.stage_reward, weight=1.0)
+        # exploration gradient: without it the policy converged to standing
+        self.rewards.stage_velocity = RewTerm(
+            func=seq_mdp.stage_velocity_reward, weight=1.0
+        )
 
         # Termination: completing the sequence ends the episode successfully;
         # base contact and the time-out remain as failures.

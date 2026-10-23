@@ -173,6 +173,28 @@ def target_delta(env: ManagerBasedRLEnv) -> torch.Tensor:
     return torch.stack((_remaining(env), heading_error), dim=1)
 
 
+def stage_velocity_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Auxiliary reward: track the current stage's target velocity.
+
+    The progress reward alone gives a standing policy no gradient toward
+    motion: standing is safe (no fall) and pays zero progress, while any
+    random attempt to walk risks a fall.  Two runs of PPO converged to
+    standing under progress-only reward.
+
+    This term pays ``exp(-4 * (|vx - target_vx| + |wz - target_wz|))`` using
+    the per-stage command from ``STAGE_COMMANDS``, which supplies the
+    exploration gradient.  It does not change the task: success is still
+    completing all four stages.
+    """
+    state = _state(env)
+    robot = _robot(env)
+    commands = torch.tensor(STAGE_COMMANDS, device=env.device)
+    target = commands[torch.clamp(state.stage, 0, NUM_STAGES - 1)]
+    lin_error = (robot.data.root_lin_vel_b[:, 0] - target[:, 0]).abs()
+    yaw_error = (robot.data.root_ang_vel_b[:, 2] - target[:, 1]).abs()
+    return torch.exp(-4.0 * (lin_error + yaw_error))
+
+
 def stage_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Shaped progress reward: pay per metre/radian of remaining error removed.
 
