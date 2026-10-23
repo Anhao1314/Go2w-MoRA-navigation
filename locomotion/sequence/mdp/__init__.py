@@ -1,15 +1,27 @@
 """Command-sequence MDP terms: stage state, observations, reward, termination.
 
-Four stages, executed in order:
+L3 difficulty (docs/RESEARCH.md ladder): four stages executed in order,
 
-1. walk forward to P1 = (start_x + 2 m, start_y)
+1. walk forward 2 m along the initial heading to P1
 2. turn in place by +90 degrees
-3. walk to P2 = (start_x + 2 m, start_y + 2 m)
-4. stop and hold for 1 s
+3. walk 2 m more (along the turned heading) to P2
+4. stop and hold 1 s
+
+Design decisions carried over from the L1 iteration (each was a diagnosed
+failure fix, see the journal):
+
+- targets are anchored on the *initial heading*, not world axes: the policy
+  tracks body-frame commands, and reset randomises yaw
+- the stage command is *closed loop*: proportional heading correction toward
+  the current target, speed reduction while turning.  A constant command let
+  a 15.8 deg heading offset accumulate past the position tolerance and the
+  stage never fired
+- "stopped" is judged on positional drift (<= STOP_DRIFT_TOLERANCE_M from the
+  stop anchor), not instantaneous speed: a settled quadruped still shows speed
+  oscillation at standstill
 
 State lives on the env instance (``_seq_state``) so the MDP terms remain
-stateless functions of the environment, which is how Isaac Lab terms are
-expected to behave.
+stateless functions of the environment.
 """
 
 from __future__ import annotations
@@ -21,12 +33,8 @@ import torch
 if TYPE_CHECKING:  # pragma: no cover
     from isaaclab.envs import ManagerBasedRLEnv
 
-# --- Difficulty L1: forward 1.2 m, then stop and hold 0.5 s ---------------
-# L3 (forward 2 m -> turn +90 -> forward 2 m -> stop 1 s) is kept in git
-# history (commit ac369fa and before) for when L1 is solved by both
-# architectures; the ladder is defined in docs/RESEARCH.md.
-FORWARD_DISTANCE_M = 1.2
-TURN_RADIANS = 1.5707963267948966  # unused at L1, kept for the L3 variant
+FORWARD_DISTANCE_M = 2.0
+TURN_RADIANS = 1.5707963267948966  # +90 degrees
 POSITION_TOLERANCE_M = 0.30
 HEADING_TOLERANCE_RAD = 0.175  # 10 degrees
 STOP_SPEED_TOLERANCE_MPS = 0.10
@@ -34,22 +42,15 @@ STOP_SPEED_TOLERANCE_MPS = 0.10
 # drift is 0.042 m (single layer) and 0.110 m (layered), both stable rather
 # than accumulating.  The same criterion is applied to both groups.
 STOP_DRIFT_TOLERANCE_M = 0.15
-STOP_HOLD_STEPS = 25  # 0.5 s at 50 Hz
-NUM_STAGES = 2
-
-# command each stage asks the low-level controller for: [vx, wz]
-STAGE_COMMANDS = (
-    (0.6, 0.0),  # forward
-    (0.0, 0.0),  # stop
-)
-STAGE_NAMES = ("forward", "stop")
+STOP_HOLD_STEPS = 50  # 1 s at 50 Hz
+NUM_STAGES = 4
 
 
 class _SeqState:
     """Per-env sequence state, created lazily on first use."""
 
     stage: torch.Tensor
-    start: torch.Tensor  # (num_envs, 3): x, y, heading
+    start: torch.Tensor  # (num_envs, 3): x, y, heading at reset
     stop_steps: torch.Tensor
     completed: torch.Tensor
     stop_anchor: torch.Tensor  # (num_envs, 2) position when the stop stage began
@@ -77,27 +78,41 @@ def _wrap(angle: torch.Tensor) -> torch.Tensor:
     return torch.atan2(torch.sin(angle), torch.cos(angle))
 
 
-def _targets(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """P1 in world coordinates, anchored on the initial heading.
-
-    The first version used world +x, which was a real bug: the policy tracks
-    the *body-frame* command, and `reset_base` randomises the initial yaw, so
-    walking "forward" in body frame never approaches a world +x target.
-    """
+def _targets(env: ManagerBasedRLEnv) -> tuple[torch.Tensor, torch.Tensor]:
+    """(P1, P2) in world coordinates, anchored on the initial heading."""
     state = _state(env)
     heading0 = state.start[:, 2]
-    forward = torch.stack((torch.cos(heading0), torch.sin(heading0)), dim=1)
-    return state.start[:, :2] + FORWARD_DISTANCE_M * forward
+    heading1 = heading0 + TURN_RADIANS
+    forward1 = torch.stack((torch.cos(heading0), torch.sin(heading0)), dim=1)
+    forward2 = torch.stack((torch.cos(heading1), torch.sin(heading1)), dim=1)
+    p1 = state.start[:, :2] + FORWARD_DISTANCE_M * forward1
+    p2 = p1 + FORWARD_DISTANCE_M * forward2
+    return p1, p2
+
+
+def _target_heading(env: ManagerBasedRLEnv) -> torch.Tensor:
+    return _state(env).start[:, 2] + TURN_RADIANS
+
+
+def _heading_error(env: ManagerBasedRLEnv) -> torch.Tensor:
+    return _wrap(_target_heading(env) - _robot(env).data.heading_w)
 
 
 def _remaining(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Remaining distance for stage 0, speed for stage 1 (stop)."""
+    """Remaining distance (stages 0/2), heading error (stage 1), speed (stage 3)."""
     state = _state(env)
     robot = _robot(env)
     position = robot.data.root_pos_w[:, :2]
-    distance = torch.norm(_targets(env) - position, dim=1)
+    p1, p2 = _targets(env)
+    distance_p1 = torch.norm(p1 - position, dim=1)
+    distance_p2 = torch.norm(p2 - position, dim=1)
+    heading_error = torch.abs(_heading_error(env))
     speed = torch.norm(robot.data.root_lin_vel_w[:, :2], dim=1)
-    return torch.where(state.stage == 0, distance, speed)
+
+    remaining = torch.where(state.stage == 0, distance_p1, distance_p2)
+    remaining = torch.where(state.stage == 1, heading_error, remaining)
+    remaining = torch.where(state.stage == 3, speed, remaining)
+    return remaining
 
 
 def reset_stage(env: ManagerBasedRLEnv, env_ids: torch.Tensor | None = None) -> None:
@@ -122,29 +137,33 @@ def _advance(env: ManagerBasedRLEnv) -> torch.Tensor:
     state = _state(env)
     robot = _robot(env)
     position = robot.data.root_pos_w[:, :2]
-    distance = torch.norm(_targets(env) - position, dim=1)
+    p1, p2 = _targets(env)
+    heading_error = torch.abs(_heading_error(env))
     speed = torch.norm(robot.data.root_lin_vel_w[:, :2], dim=1)
 
-    at_p1 = distance <= POSITION_TOLERANCE_M
+    at_p1 = torch.norm(p1 - position, dim=1) <= POSITION_TOLERANCE_M
+    at_p2 = torch.norm(p2 - position, dim=1) <= POSITION_TOLERANCE_M
+    turned = heading_error <= HEADING_TOLERANCE_RAD
 
-    # "Stopped" is judged on positional drift, not instantaneous speed.  A
-    # trained policy held the stop stage to 3 cm of travel over 300 steps while
-    # its speed oscillated between 0.003 and 0.511 m/s (mean 0.133, smoothed
-    # 0.13), so both the per-step and the smoothed speed criteria kept
-    # resetting the counter.  Drift matches what "the robot stopped" means.
+    # hold timer only accumulates during the stop stage; judged on drift
     drift = torch.norm(position - state.stop_anchor, dim=1)
-    holding = (state.stage == 1) & (drift <= STOP_DRIFT_TOLERANCE_M)
+    holding = (state.stage == 3) & (drift <= STOP_DRIFT_TOLERANCE_M)
     state.stop_steps = torch.where(holding, state.stop_steps + 1.0, torch.zeros_like(state.stop_steps))
     held = state.stop_steps >= STOP_HOLD_STEPS
 
-    advanced = ((state.stage == 0) & at_p1) | ((state.stage == 1) & held)
+    advanced = (
+        ((state.stage == 0) & at_p1)
+        | ((state.stage == 1) & turned)
+        | ((state.stage == 2) & at_p2)
+        | ((state.stage == 3) & held)
+    )
     state.stage = torch.where(advanced, state.stage + 1, state.stage)
+    state.completed = state.stage >= NUM_STAGES
     # anchor the stop stage at the position where it began
-    just_entered_stop = advanced & (state.stage == 1)
+    just_entered_stop = advanced & (state.stage == 3)
     state.stop_anchor = torch.where(
         just_entered_stop.unsqueeze(1), position, state.stop_anchor
     )
-    state.completed = state.stage >= NUM_STAGES
     # The episode resets in the same step it completes, wiping `completed`, so
     # completion is also appended to a log that only the evaluator clears.
     log = getattr(env, "_seq_success_log", None)
@@ -157,32 +176,39 @@ def _advance(env: ManagerBasedRLEnv) -> torch.Tensor:
 
 
 def stage_command(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Observation: the [vx, wz] command the current stage asks for.
+    """Observation: the closed-loop [vx, wz] command the current stage asks for.
 
-    Stage 0 is a *closed-loop* command: forward speed plus a proportional
-    heading correction toward P1.  The first version emitted a constant
-    ``[0.6, 0]``; the policy then walked straight, but any initial heading
-    offset from the target direction accumulated sideways error (measured
-    15.8 deg -> 0.33 m lateral at 1.2 m) and the stage never fired, so the
-    robot kept walking away.  The correction is the rule-level "high-level
-    instruction" that the low-level policy executes, which is exactly the
-    layering the project studies.
+    Stages 0/2 aim at their target point; stage 1 turns in place toward the
+    target heading; stage 3 commands a stop.  This instruction is the
+    rule-level "high-level command" that separates the groups: group B's S1
+    only has to learn when to (re)issue it in 2-dim space, while group A must
+    realise the same behaviour in 12-dim joint space.
     """
     state = _state(env)
     robot = _robot(env)
+    position = robot.data.root_pos_w[:, :2]
 
-    delta = _targets(env) - robot.data.root_pos_w[:, :2]
+    # stages 0 and 2 share the walk-to-point controller with different targets
+    p1, p2 = _targets(env)
+    target = torch.where((state.stage == 2).unsqueeze(1), p2, p1)
+    delta = target - position
     desired_heading = torch.atan2(delta[:, 1], delta[:, 0])
-    heading_error = _wrap(desired_heading - robot.data.heading_w)
+    walk_error = _wrap(desired_heading - robot.data.heading_w)
+    walk_speed = 0.6 * torch.clamp(1.0 - 0.8 * walk_error.abs(), 0.15, 1.0)
+    walk_turn = torch.clamp(2.0 * walk_error, -1.0, 1.0)
 
-    # slow down while turning; full speed when roughly aligned
-    speed = 0.6 * torch.clamp(1.0 - 0.8 * heading_error.abs(), 0.15, 1.0)
-    turn = torch.clamp(2.0 * heading_error, -1.0, 1.0)
+    # stage 1 turns in place toward the +90 deg heading
+    turn_error = _heading_error(env)
+    turn_speed = torch.zeros_like(walk_speed)
+    turn_turn = torch.clamp(2.0 * turn_error, -1.0, 1.0)
 
-    stopping = state.stage >= 1
-    speed = torch.where(stopping, torch.zeros_like(speed), speed)
-    turn = torch.where(stopping, torch.zeros_like(turn), turn)
-    return torch.stack((speed, turn), dim=1)
+    vx = torch.where(state.stage == 1, turn_speed, walk_speed)
+    wz = torch.where(state.stage == 1, turn_turn, walk_turn)
+
+    stopping = state.stage >= 3
+    vx = torch.where(stopping, torch.zeros_like(vx), vx)
+    wz = torch.where(stopping, torch.zeros_like(wz), wz)
+    return torch.stack((vx, wz), dim=1)
 
 
 def stage_onehot(env: ManagerBasedRLEnv) -> torch.Tensor:
@@ -193,46 +219,31 @@ def stage_onehot(env: ManagerBasedRLEnv) -> torch.Tensor:
 
 
 def target_delta(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Observation: remaining distance and heading error to the current target."""
-    state = _state(env)
-    heading_error = torch.abs(_wrap(state.start[:, 2] - _robot(env).data.heading_w))
-    return torch.stack((_remaining(env), heading_error), dim=1)
+    """Observation: remaining amount for the current stage and target-heading error."""
+    return torch.stack((_remaining(env), _heading_error(env)), dim=1)
 
 
 def stage_velocity_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Auxiliary reward: track the current stage's target velocity.
+    """Auxiliary reward: track the current stage's closed-loop command.
 
-    The progress reward alone gives a standing policy no gradient toward
-    motion: standing is safe (no fall) and pays zero progress, while any
-    random attempt to walk risks a fall.  Two runs of PPO converged to
-    standing under progress-only reward.
-
-    This term pays ``exp(-4 * (|vx - target_vx| + |wz - target_wz|))`` using
-    the per-stage command from ``STAGE_COMMANDS``, which supplies the
-    exploration gradient.  It does not change the task: success is still
-    completing all four stages.
+    Without this term the policy converges to standing (progress-only reward
+    gives no exploration gradient toward motion); two PPO runs failed that way
+    before it was added.
     """
     robot = _robot(env)
-    target = stage_command(env)  # same closed-loop instruction the policy sees
+    target = stage_command(env)
     lin_error = (robot.data.root_lin_vel_b[:, 0] - target[:, 0]).abs()
     yaw_error = (robot.data.root_ang_vel_b[:, 2] - target[:, 1]).abs()
     return torch.exp(-4.0 * (lin_error + yaw_error))
 
 
 def stage_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Shaped progress reward: pay per metre/radian of remaining error removed.
+    """Shaped progress reward: pay per unit of remaining error removed.
 
-    A plain ``exp(-k * remaining)`` reward was tried first and failed: at a 2 m
-    standoff it is ~0.018 per step and its gradient (~0.037 per metre) is
-    smaller than the action/posture penalties, so standing still was the local
-    optimum and the policy never advanced.  The difference form gives a
-    constant signal per step of progress:
-
-        r_t = 10 * clip(remaining_{t-1} - remaining_t, -0.05, 0.05)
+    r_t = 10 * clip(remaining_{t-1} - remaining_t, -0.05, 0.05) + 10 * advanced
 
     Stage transitions reset the baseline so the metric change between stages
-    (distance -> heading error) is not paid as progress; a flat +10 bonus marks
-    the transition instead.
+    (distance -> heading error -> speed) is not paid as progress.
     """
     advanced = _advance(env)
     state = _state(env)
