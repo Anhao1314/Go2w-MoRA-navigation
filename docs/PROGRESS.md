@@ -25,7 +25,8 @@
 | W1.2 | Go2 模型参数导出 | ✅ | `locomotion/guardrail/go2_model.json`（19 bodies / 12 joints / 14.971 kg / SHA-256 `12b78af4`） |
 | W1.3 | C++ 浮基 FK + CoM + 支撑多边形 | 🟡 第一版完成 | `cpp/guardrail/`（model/kinematics/tests）；CI cpp job 编译与测试通过 |
 | W1.4 | 数值对比报告 | ⏳ | 与 Isaac 的 FK/CoM 对比 |
-| W1.5 | 命令序列任务环境（P1） | 🟡 第一版完成 | `locomotion/sequence/`，53 维观测，4 阶段状态机，冒烟通过 |
+| W1.5 | 命令序列任务环境（P1） | 🟡 L1 版本 | `locomotion/sequence/`，53 维观测；L1 = 前进 1.2 m + 停止 0.5 s |
+| W1.6 | **单层基线 A（L1）** | ✅ **20/20 成功** | `success_rate 1.00`，平均 564 步（11.3 s），零摔倒；运动视频 `robot_motion_l1_success.mp4` |
 
 ## 阻塞与风险
 
