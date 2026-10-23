@@ -140,10 +140,32 @@ def _advance(env: ManagerBasedRLEnv) -> torch.Tensor:
 
 
 def stage_command(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Observation: the [vx, wz] command requested by the current stage."""
+    """Observation: the [vx, wz] command the current stage asks for.
+
+    Stage 0 is a *closed-loop* command: forward speed plus a proportional
+    heading correction toward P1.  The first version emitted a constant
+    ``[0.6, 0]``; the policy then walked straight, but any initial heading
+    offset from the target direction accumulated sideways error (measured
+    15.8 deg -> 0.33 m lateral at 1.2 m) and the stage never fired, so the
+    robot kept walking away.  The correction is the rule-level "high-level
+    instruction" that the low-level policy executes, which is exactly the
+    layering the project studies.
+    """
     state = _state(env)
-    commands = torch.tensor(STAGE_COMMANDS, device=env.device)
-    return commands[torch.clamp(state.stage, 0, NUM_STAGES - 1)]
+    robot = _robot(env)
+
+    delta = _targets(env) - robot.data.root_pos_w[:, :2]
+    desired_heading = torch.atan2(delta[:, 1], delta[:, 0])
+    heading_error = _wrap(desired_heading - robot.data.heading_w)
+
+    # slow down while turning; full speed when roughly aligned
+    speed = 0.6 * torch.clamp(1.0 - 0.8 * heading_error.abs(), 0.15, 1.0)
+    turn = torch.clamp(2.0 * heading_error, -1.0, 1.0)
+
+    stopping = state.stage >= 1
+    speed = torch.where(stopping, torch.zeros_like(speed), speed)
+    turn = torch.where(stopping, torch.zeros_like(turn), turn)
+    return torch.stack((speed, turn), dim=1)
 
 
 def stage_onehot(env: ManagerBasedRLEnv) -> torch.Tensor:
@@ -173,10 +195,8 @@ def stage_velocity_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
     exploration gradient.  It does not change the task: success is still
     completing all four stages.
     """
-    state = _state(env)
     robot = _robot(env)
-    commands = torch.tensor(STAGE_COMMANDS, device=env.device)
-    target = commands[torch.clamp(state.stage, 0, NUM_STAGES - 1)]
+    target = stage_command(env)  # same closed-loop instruction the policy sees
     lin_error = (robot.data.root_lin_vel_b[:, 0] - target[:, 0]).abs()
     yaw_error = (robot.data.root_ang_vel_b[:, 2] - target[:, 1]).abs()
     return torch.exp(-4.0 * (lin_error + yaw_error))
