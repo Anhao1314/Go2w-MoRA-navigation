@@ -345,7 +345,16 @@ class LogWatcher:
 
         current = next((s for s in self._seeds.values() if s.get("state") == "training"), None)
         if current is None:
-            return
+            if self.num_seeds == 1:
+                # A direct launcher run has no "=== SEED n START ===" marker
+                # (that marker only exists in the three-seed loop), so a
+                # single-seed monitor adopts the first metric line as seed 0.
+                current = self._seeds[0]
+                current["state"] = "training"
+                if not current.get("started"):
+                    current["started"] = time.strftime("%H:%M:%S")
+            else:
+                return
 
         match = ITERATION.search(clean)
         if match:
