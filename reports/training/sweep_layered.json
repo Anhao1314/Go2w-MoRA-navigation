@@ -1,0 +1,43 @@
+{
+  "run_dir": "logs/rsl_rl_layered/2026-10-23_16-55-02",
+  "layered": true,
+  "episodes": 20,
+  "results": [
+    {
+      "iteration": 100,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 200,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 300,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 500,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 700,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 1000,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 1499,
+      "success_rate": 1.0,
+      "episodes": 20
+    }
+  ],
+  "generated_at": "2026-10-23T17:58:38+0800"
+}

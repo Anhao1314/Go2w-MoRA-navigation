@@ -1,0 +1,43 @@
+{
+  "run_dir": "logs/rsl_rl/go2_loco_sequence/2026-10-23_15-26-53",
+  "layered": false,
+  "episodes": 20,
+  "results": [
+    {
+      "iteration": 100,
+      "success_rate": 0.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 200,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 300,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 500,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 700,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 1000,
+      "success_rate": 1.0,
+      "episodes": 20
+    },
+    {
+      "iteration": 1499,
+      "success_rate": 1.0,
+      "episodes": 20
+    }
+  ],
+  "generated_at": "2026-10-23T17:53:50+0800"
+}
