@@ -21,21 +21,24 @@ import torch
 if TYPE_CHECKING:  # pragma: no cover
     from isaaclab.envs import ManagerBasedRLEnv
 
-FORWARD_DISTANCE_M = 2.0
-TURN_RADIANS = 1.5707963267948966  # +90 degrees
+# --- Difficulty L1: forward 1.2 m, then stop and hold 0.5 s ---------------
+# L3 (forward 2 m -> turn +90 -> forward 2 m -> stop 1 s) is kept in git
+# history (commit ac369fa and before) for when L1 is solved by both
+# architectures; the ladder is defined in docs/RESEARCH.md.
+FORWARD_DISTANCE_M = 1.2
+TURN_RADIANS = 1.5707963267948966  # unused at L1, kept for the L3 variant
 POSITION_TOLERANCE_M = 0.30
 HEADING_TOLERANCE_RAD = 0.175  # 10 degrees
 STOP_SPEED_TOLERANCE_MPS = 0.10
-STOP_HOLD_STEPS = 50  # 1 s at 50 Hz
-NUM_STAGES = 4
+STOP_HOLD_STEPS = 25  # 0.5 s at 50 Hz
+NUM_STAGES = 2
 
 # command each stage asks the low-level controller for: [vx, wz]
 STAGE_COMMANDS = (
     (0.6, 0.0),  # forward
-    (0.0, 0.6),  # turn left
-    (0.6, 0.0),  # forward
     (0.0, 0.0),  # stop
 )
+STAGE_NAMES = ("forward", "stop")
 
 
 class _SeqState:
@@ -68,45 +71,27 @@ def _wrap(angle: torch.Tensor) -> torch.Tensor:
     return torch.atan2(torch.sin(angle), torch.cos(angle))
 
 
-def _targets(env: ManagerBasedRLEnv) -> tuple[torch.Tensor, torch.Tensor]:
-    """Return (P1, P2) in world coordinates, defined relative to the initial heading.
+def _targets(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """P1 in world coordinates, anchored on the initial heading.
 
-    The first version used world +x / +y, which was a real bug: the policy
-    tracks the *body-frame* command, and `reset_base` randomises the initial
-    yaw, so walking "forward" in body frame does not approach a world +x
-    target.  Training looked healthy (velocity tracking 0.74) while no episode
-    ever left stage 0.
-
-    The path is now an L shape anchored on the start pose: P1 is 2 m along the
-    initial heading, P2 is another 2 m along that heading turned by +90 degrees.
+    The first version used world +x, which was a real bug: the policy tracks
+    the *body-frame* command, and `reset_base` randomises the initial yaw, so
+    walking "forward" in body frame never approaches a world +x target.
     """
     state = _state(env)
     heading0 = state.start[:, 2]
-    heading1 = heading0 + TURN_RADIANS
-    forward1 = torch.stack((torch.cos(heading0), torch.sin(heading0)), dim=1)
-    forward2 = torch.stack((torch.cos(heading1), torch.sin(heading1)), dim=1)
-    p1 = state.start[:, :2] + FORWARD_DISTANCE_M * forward1
-    p2 = p1 + FORWARD_DISTANCE_M * forward2
-    return p1, p2
+    forward = torch.stack((torch.cos(heading0), torch.sin(heading0)), dim=1)
+    return state.start[:, :2] + FORWARD_DISTANCE_M * forward
 
 
 def _remaining(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Remaining distance (stage 0/2), heading error (stage 1), or speed (stage 3)."""
+    """Remaining distance for stage 0, speed for stage 1 (stop)."""
     state = _state(env)
     robot = _robot(env)
     position = robot.data.root_pos_w[:, :2]
-    p1, p2 = _targets(env)
-    distance_p1 = torch.norm(p1 - position, dim=1)
-    distance_p2 = torch.norm(p2 - position, dim=1)
-    heading_error = torch.abs(
-        _wrap(state.start[:, 2] + TURN_RADIANS - robot.data.heading_w)
-    )
+    distance = torch.norm(_targets(env) - position, dim=1)
     speed = torch.norm(robot.data.root_lin_vel_w[:, :2], dim=1)
-
-    remaining = torch.where(state.stage == 0, distance_p1, distance_p2)
-    remaining = torch.where(state.stage == 1, heading_error, remaining)
-    remaining = torch.where(state.stage == 3, speed, remaining)
-    return remaining
+    return torch.where(state.stage == 0, distance, speed)
 
 
 def reset_stage(env: ManagerBasedRLEnv, env_ids: torch.Tensor | None = None) -> None:
@@ -130,27 +115,17 @@ def _advance(env: ManagerBasedRLEnv) -> torch.Tensor:
     state = _state(env)
     robot = _robot(env)
     position = robot.data.root_pos_w[:, :2]
-    p1, p2 = _targets(env)
-    heading_error = torch.abs(
-        _wrap(state.start[:, 2] + TURN_RADIANS - robot.data.heading_w)
-    )
+    distance = torch.norm(_targets(env) - position, dim=1)
     speed = torch.norm(robot.data.root_lin_vel_w[:, :2], dim=1)
 
-    at_p1 = torch.norm(p1 - position, dim=1) <= POSITION_TOLERANCE_M
-    at_p2 = torch.norm(p2 - position, dim=1) <= POSITION_TOLERANCE_M
-    turned = heading_error <= HEADING_TOLERANCE_RAD
+    at_p1 = distance <= POSITION_TOLERANCE_M
 
-    # hold timer only accumulates during stage 3
-    holding = (state.stage == 3) & (speed <= STOP_SPEED_TOLERANCE_MPS)
+    # hold timer only accumulates during the stop stage
+    holding = (state.stage == 1) & (speed <= STOP_SPEED_TOLERANCE_MPS)
     state.stop_steps = torch.where(holding, state.stop_steps + 1.0, torch.zeros_like(state.stop_steps))
     held = state.stop_steps >= STOP_HOLD_STEPS
 
-    advanced = (
-        ((state.stage == 0) & at_p1)
-        | ((state.stage == 1) & turned)
-        | ((state.stage == 2) & at_p2)
-        | ((state.stage == 3) & held)
-    )
+    advanced = ((state.stage == 0) & at_p1) | ((state.stage == 1) & held)
     state.stage = torch.where(advanced, state.stage + 1, state.stage)
     state.completed = state.stage >= NUM_STAGES
     # The episode resets in the same step it completes, wiping `completed`, so
@@ -181,7 +156,7 @@ def stage_onehot(env: ManagerBasedRLEnv) -> torch.Tensor:
 def target_delta(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Observation: remaining distance and heading error to the current target."""
     state = _state(env)
-    heading_error = _wrap(state.start[:, 2] + TURN_RADIANS - _robot(env).data.heading_w)
+    heading_error = torch.abs(_wrap(state.start[:, 2] - _robot(env).data.heading_w))
     return torch.stack((_remaining(env), heading_error), dim=1)
 
 
