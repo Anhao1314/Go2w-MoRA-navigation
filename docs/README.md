@@ -10,6 +10,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
+| [PROJECT_FLOW.md](PROJECT_FLOW.md) | **项目全流程**：研究问题 → 7 个阶段（基础设施 / S0 基线 / 任务定义 / 单层 A / 分层 B / 对比归因 / 交付），每阶段的输入、动作、产出与判据，以及当前进度位置 |
 | [RESEARCH.md](RESEARCH.md) | **研究主线**：MoRA 式多层架构 vs 端到端单层的受控对比——样本效率、成功率、泛化、失败归因、接口损失；仲裁层降为层间约束子研究 |
 | [notes/training-efficiency.md](notes/training-efficiency.md) | **训练效率调研**：实测算力基线、Rudin 2021 与 Isaac Lab 官方基准、包装器开销、2 路并行与评估并行化方案、效率实验的纪律边界 |
 | [PLAN.md](PLAN.md) | **执行计划**：WBS（逐任务产出与验收）、过程记录规范（日志 / ADR / 证据卡）、质量门、止损规则 |
