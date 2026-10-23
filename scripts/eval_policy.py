@@ -246,6 +246,94 @@ def evaluate_serial(
     return rows
 
 
+def evaluate_sequence(
+    args: argparse.Namespace,
+    checkpoint: pathlib.Path,
+    seeds: list[int],
+    modules: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Stage-based evaluation of the four-stage command sequence.
+
+    Success is "all four stages completed", not velocity tracking: the task has
+    no command manager and no tracking reward.  Episode length comes from the
+    env (60 s = 3000 steps), not from the 20 s tracking constant.
+    """
+    gym = modules["gym"]
+    torch = modules["torch"]
+    parse_env_cfg = modules["parse_env_cfg"]
+    RslRlVecEnvWrapper = modules["RslRlVecEnvWrapper"]
+    OnPolicyRunner = modules["OnPolicyRunner"]
+    load_cfg_from_registry = modules["load_cfg_from_registry"]
+
+    num_envs = len(seeds)
+    env_cfg = parse_env_cfg(args.task, device="cuda:0", num_envs=num_envs, use_fabric=True)
+    env_cfg.seed = 0
+    env = gym.make(args.task, cfg=env_cfg)
+    inner = cast(Any, env.unwrapped)
+    vec_env = RslRlVecEnvWrapper(env)
+
+    runner_cfg = load_cfg_from_registry(args.task, "rsl_rl_cfg_entry_point")
+    runner = OnPolicyRunner(vec_env, runner_cfg.to_dict(), log_dir=None, device="cuda:0")
+    runner.load(str(checkpoint))
+    policy = runner.get_inference_policy(device="cuda:0")
+
+    obs, _ = vec_env.reset()
+    inner._seq_success_log = set()  # the MDP appends env ids that finish all stages
+    steps_max = int(inner.max_episode_length)
+    max_stage = np.zeros(num_envs, dtype=int)
+    done_step = np.full(num_envs, steps_max, dtype=int)
+    active = np.ones(num_envs, dtype=bool)
+
+    with torch.inference_mode():
+        for step in range(steps_max):
+            stage = _as_float(inner._seq_state.stage).astype(int)
+            max_stage[active] = np.maximum(max_stage[active], stage[active])
+            actions = policy(obs)
+            obs, _, dones, _ = vec_env.step(actions)
+            newly_done = _as_bool(dones) & active
+            if newly_done.any():
+                done_step[newly_done] = step + 1
+                active[newly_done] = False
+            if not active.any():
+                break
+
+    succeeded = {int(index) for index in getattr(inner, "_seq_success_log", set())}
+    vec_env.close()
+
+    rows: list[dict[str, Any]] = []
+    for index, seed in enumerate(seeds):
+        success = index in succeeded
+        rows.append(
+            {
+                "seed": seed,
+                "steps": int(done_step[index]),
+                "success": success,
+                "max_stage": 4 if success else int(max_stage[index]),
+                "fall": int(done_step[index]) < steps_max and not success,
+            }
+        )
+        print(
+            f"[eval] seed={seed} steps={int(done_step[index])} success={success} "
+            f"max_stage={rows[-1]['max_stage']}",
+            flush=True,
+        )
+
+    reached = np.array([row["max_stage"] for row in rows])
+    extra = {
+        "success_rate": float(np.mean([row["success"] for row in rows])),
+        "stage_reach_rate": {
+            str(stage): float(np.mean(reached > stage)) for stage in range(4)
+        },
+        "mean_steps_to_finish": float(
+            np.mean([row["steps"] for row in rows if row["success"]])
+        )
+        if any(row["success"] for row in rows)
+        else None,
+        "episode_length_steps": steps_max,
+    }
+    return rows, extra
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task", default="Go2Loco-S1-Flat-Blind-v0")
@@ -272,6 +360,7 @@ def main(argv: list[str] | None = None) -> int:
     from rsl_rl.runners import OnPolicyRunner
 
     import locomotion.isaac  # noqa: F401
+    import locomotion.sequence  # noqa: F401
     from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
     from isaaclab_tasks.utils import parse_env_cfg
     from isaaclab_tasks.utils.parse_cfg import load_cfg_from_registry
@@ -289,7 +378,12 @@ def main(argv: list[str] | None = None) -> int:
     checkpoint = args.checkpoint or latest_checkpoint(run_dir)
 
     started = time.time()
-    if args.serial:
+    is_sequence = "sequence" in args.task.lower()
+    extra: dict[str, Any] = {}
+    if is_sequence:
+        rows, extra = evaluate_sequence(args, checkpoint, seeds, modules)
+        method = "sequence_stage_based"
+    elif args.serial:
         rows = evaluate_serial(args, checkpoint, seeds, modules)
         method = "serial_per_seed"
     else:
@@ -297,24 +391,38 @@ def main(argv: list[str] | None = None) -> int:
         method = "parallel_20_envs_seed0"
     elapsed = time.time() - started
 
-    vx = np.array([row["vx_rmse"] for row in rows if row["vx_rmse"] is not None])
-    wz = np.array([row["wz_rmse"] for row in rows if row["wz_rmse"] is not None])
-    falls = [bool(row["fall"]) for row in rows]
-
-    summary = {
-        "episodes": len(rows),
-        "seeds": [row["seed"] for row in rows],
-        "vx_rmse_mean": float(vx.mean()) if vx.size else None,
-        "vx_rmse_std": float(vx.std(ddof=0)) if vx.size else None,
-        "wz_rmse_mean": float(wz.mean()) if wz.size else None,
-        "wz_rmse_std": float(wz.std(ddof=0)) if wz.size else None,
-        "fall_rate": fall_rate(falls),
-        "checkpoint": str(checkpoint),
-        "task": args.task,
-        "method": method,
-        "wall_time_s": round(elapsed, 1),
-        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-    }
+    if is_sequence:
+        summary: dict[str, Any] = {
+            "episodes": len(rows),
+            "seeds": [row["seed"] for row in rows],
+            "success_rate": extra["success_rate"],
+            "stage_reach_rate": extra["stage_reach_rate"],
+            "mean_steps_to_finish": extra["mean_steps_to_finish"],
+            "fall_rate": fall_rate([bool(row["fall"]) for row in rows]),
+            "episode_length_steps": extra["episode_length_steps"],
+            "checkpoint": str(checkpoint),
+            "task": args.task,
+            "method": method,
+            "wall_time_s": round(elapsed, 1),
+            "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        }
+    else:
+        vx = np.array([row["vx_rmse"] for row in rows if row["vx_rmse"] is not None])
+        wz = np.array([row["wz_rmse"] for row in rows if row["wz_rmse"] is not None])
+        summary = {
+            "episodes": len(rows),
+            "seeds": [row["seed"] for row in rows],
+            "vx_rmse_mean": float(vx.mean()) if vx.size else None,
+            "vx_rmse_std": float(vx.std(ddof=0)) if vx.size else None,
+            "wz_rmse_mean": float(wz.mean()) if wz.size else None,
+            "wz_rmse_std": float(wz.std(ddof=0)) if wz.size else None,
+            "fall_rate": fall_rate([bool(row["fall"]) for row in rows]),
+            "checkpoint": str(checkpoint),
+            "task": args.task,
+            "method": method,
+            "wall_time_s": round(elapsed, 1),
+            "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        }
 
     output = args.output or (run_dir / "evaluation.json")
     output.parent.mkdir(parents=True, exist_ok=True)

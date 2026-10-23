@@ -105,6 +105,8 @@ def reset_stage(env: ManagerBasedRLEnv, env_ids: torch.Tensor | None = None) -> 
     state.stage[ids] = 0
     state.stop_steps[ids] = 0.0
     state.completed[ids] = False
+    if hasattr(state, "prev_remaining"):
+        delattr(state, "prev_remaining")  # rebuilt on the next reward call
     position = robot.data.root_pos_w[ids]
     state.start[ids, 0] = position[:, 0]
     state.start[ids, 1] = position[:, 1]
@@ -139,6 +141,14 @@ def _advance(env: ManagerBasedRLEnv) -> torch.Tensor:
     )
     state.stage = torch.where(advanced, state.stage + 1, state.stage)
     state.completed = state.stage >= NUM_STAGES
+    # The episode resets in the same step it completes, wiping `completed`, so
+    # completion is also appended to a log that only the evaluator clears.
+    log = getattr(env, "_seq_success_log", None)
+    if log is None:
+        log = set()
+        env._seq_success_log = log  # type: ignore[attr-defined]
+    for env_id in (state.completed & advanced).nonzero(as_tuple=True)[0].tolist():
+        log.add(int(env_id))
     return advanced
 
 
@@ -164,10 +174,33 @@ def target_delta(env: ManagerBasedRLEnv) -> torch.Tensor:
 
 
 def stage_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Progress toward the current stage target, plus a bonus on each advance."""
+    """Shaped progress reward: pay per metre/radian of remaining error removed.
+
+    A plain ``exp(-k * remaining)`` reward was tried first and failed: at a 2 m
+    standoff it is ~0.018 per step and its gradient (~0.037 per metre) is
+    smaller than the action/posture penalties, so standing still was the local
+    optimum and the policy never advanced.  The difference form gives a
+    constant signal per step of progress:
+
+        r_t = 10 * clip(remaining_{t-1} - remaining_t, -0.05, 0.05)
+
+    Stage transitions reset the baseline so the metric change between stages
+    (distance -> heading error) is not paid as progress; a flat +10 bonus marks
+    the transition instead.
+    """
     advanced = _advance(env)
+    state = _state(env)
     remaining = _remaining(env)
-    return torch.exp(-2.0 * remaining) + 10.0 * advanced.float()
+
+    previous = getattr(state, "prev_remaining", None)
+    if previous is None:
+        state.prev_remaining = remaining.clone()  # type: ignore[attr-defined]
+        return 10.0 * advanced.float()
+
+    delta = previous - remaining
+    delta = torch.where(advanced, torch.zeros_like(delta), delta)
+    state.prev_remaining = remaining.clone()  # type: ignore[attr-defined]
+    return 10.0 * delta.clamp(min=-0.05, max=0.05) + 10.0 * advanced.float()
 
 
 def sequence_complete(env: ManagerBasedRLEnv) -> torch.Tensor:
