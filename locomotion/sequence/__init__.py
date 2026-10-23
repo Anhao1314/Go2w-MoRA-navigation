@@ -17,7 +17,7 @@ gym.register(
             "locomotion.sequence.sequence_env_cfg:Go2SequenceEnvCfg"
         ),
         "rsl_rl_cfg_entry_point": (
-            "locomotion.isaac.agents.rsl_rl_ppo_cfg:Go2S1FlatPPORunnerCfg"
+            "locomotion.isaac.agents.rsl_rl_ppo_cfg:Go2SequencePPORunnerCfg"
         ),
     },
 )

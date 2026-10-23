@@ -65,3 +65,12 @@ class Go2S2bLightTerrainPPORunnerCfg(Go2VelocityPPORunnerCfg):
     def __post_init__(self):
         super().__post_init__()
         self.experiment_name = "go2_loco_s2b_light_terrain"
+
+
+@configclass
+class Go2SequencePPORunnerCfg(Go2VelocityPPORunnerCfg):
+    """Four-stage command sequence (docs/RESEARCH.md)."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.experiment_name = "go2_loco_sequence"

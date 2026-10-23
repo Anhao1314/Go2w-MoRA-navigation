@@ -4,6 +4,7 @@ from locomotion.isaac.agents.rsl_rl_ppo_cfg import (
     Go2S1FlatPPORunnerCfg,
     Go2S2DisturbancePPORunnerCfg,
     Go2S2bLightTerrainPPORunnerCfg,
+    Go2SequencePPORunnerCfg,
     Go2VelocityPPORunnerCfg,
 )
 
@@ -12,4 +13,5 @@ __all__ = [
     "Go2S1FlatPPORunnerCfg",
     "Go2S2DisturbancePPORunnerCfg",
     "Go2S2bLightTerrainPPORunnerCfg",
+    "Go2SequencePPORunnerCfg",
 ]
