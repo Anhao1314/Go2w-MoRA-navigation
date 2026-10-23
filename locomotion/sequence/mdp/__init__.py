@@ -30,6 +30,7 @@ TURN_RADIANS = 1.5707963267948966  # unused at L1, kept for the L3 variant
 POSITION_TOLERANCE_M = 0.30
 HEADING_TOLERANCE_RAD = 0.175  # 10 degrees
 STOP_SPEED_TOLERANCE_MPS = 0.10
+STOP_DRIFT_TOLERANCE_M = 0.05
 STOP_HOLD_STEPS = 25  # 0.5 s at 50 Hz
 NUM_STAGES = 2
 
@@ -48,6 +49,7 @@ class _SeqState:
     start: torch.Tensor  # (num_envs, 3): x, y, heading
     stop_steps: torch.Tensor
     completed: torch.Tensor
+    stop_anchor: torch.Tensor  # (num_envs, 2) position when the stop stage began
 
 
 def _state(env: ManagerBasedRLEnv) -> _SeqState:
@@ -59,6 +61,7 @@ def _state(env: ManagerBasedRLEnv) -> _SeqState:
         state.start = torch.zeros(env.num_envs, 3, device=device)
         state.stop_steps = torch.zeros(env.num_envs, device=device)
         state.completed = torch.zeros(env.num_envs, dtype=torch.bool, device=device)
+        state.stop_anchor = torch.zeros(env.num_envs, 2, device=device)
         env._seq_state = state  # type: ignore[attr-defined]
     return state
 
@@ -105,6 +108,7 @@ def reset_stage(env: ManagerBasedRLEnv, env_ids: torch.Tensor | None = None) -> 
     if hasattr(state, "prev_remaining"):
         delattr(state, "prev_remaining")  # rebuilt on the next reward call
     position = robot.data.root_pos_w[ids]
+    state.stop_anchor[ids] = position[:, :2]
     state.start[ids, 0] = position[:, 0]
     state.start[ids, 1] = position[:, 1]
     state.start[ids, 2] = robot.data.heading_w[ids]
@@ -120,13 +124,25 @@ def _advance(env: ManagerBasedRLEnv) -> torch.Tensor:
 
     at_p1 = distance <= POSITION_TOLERANCE_M
 
-    # hold timer only accumulates during the stop stage
-    holding = (state.stage == 1) & (speed <= STOP_SPEED_TOLERANCE_MPS)
+    # "Stopped" is judged on positional drift, not instantaneous speed.  A
+    # trained policy held the stop stage to 3 cm of travel over 300 steps while
+    # its speed oscillated between 0.003 and 0.511 m/s (mean 0.133, smoothed
+    # 0.13), so both the per-step and the smoothed speed criteria kept
+    # resetting the counter.  Drift matches what "the robot stopped" means.
+    drift = torch.norm(position - state.stop_anchor, dim=1)
+    holding = (state.stage == 1) & (drift <= STOP_DRIFT_TOLERANCE_M) & (
+        speed <= STOP_SPEED_TOLERANCE_MPS * 3.0
+    )
     state.stop_steps = torch.where(holding, state.stop_steps + 1.0, torch.zeros_like(state.stop_steps))
     held = state.stop_steps >= STOP_HOLD_STEPS
 
     advanced = ((state.stage == 0) & at_p1) | ((state.stage == 1) & held)
     state.stage = torch.where(advanced, state.stage + 1, state.stage)
+    # anchor the stop stage at the position where it began
+    just_entered_stop = advanced & (state.stage == 1)
+    state.stop_anchor = torch.where(
+        just_entered_stop.unsqueeze(1), position, state.stop_anchor
+    )
     state.completed = state.stage >= NUM_STAGES
     # The episode resets in the same step it completes, wiping `completed`, so
     # completion is also appended to a log that only the evaluator clears.
