@@ -84,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     import torch
 
     import locomotion.isaac  # noqa: F401
+    import isaaclab.sim as sim_utils
     from isaaclab.sensors import TiledCameraCfg
     from isaaclab_tasks.utils import parse_env_cfg
     from isaaclab_tasks.utils.parse_cfg import load_cfg_from_registry
@@ -96,16 +97,25 @@ def main(argv: list[str] | None = None) -> int:
     for checkpoint in checkpoints:
         env_cfg = parse_env_cfg(args.task, device="cuda:0", num_envs=args.num_envs, use_fabric=True)
         env_cfg.seed = args.seed
-        # recording-only camera; the task itself stays blind
+        # Recording-only camera; the task itself stays blind. The `spawn` block
+        # is required -- without a PinholeCameraCfg the camera prim is never
+        # created and the process crashed with an access violation on startup
+        # (see the journal entry for the first attempt).
         env_cfg.scene.camera = TiledCameraCfg(
             prim_path="{ENV_REGEX_NS}/Camera",
             offset=TiledCameraCfg.OffsetCfg(
                 pos=(2.6, -2.6, 1.7), rot=(0.84, 0.22, 0.22, 0.44), convention="ros"
             ),
+            spawn=sim_utils.PinholeCameraCfg(
+                focal_length=24.0,
+                focus_distance=400.0,
+                horizontal_aperture=20.955,
+                clipping_range=(0.1, 1.0e5),
+            ),
             data_types=["rgb"],
             width=960,
             height=540,
-            update_period=0.0,
+            update_period=0,
         )
         env = gym.make(args.task, cfg=env_cfg)
         prefix = f"{run_dir.name}_{checkpoint.stem}"
